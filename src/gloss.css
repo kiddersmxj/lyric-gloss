@@ -1,0 +1,25 @@
+/* lyric-gloss — the translated line, under the original, in smaller dimmer text.
+ *
+ * lyrics-plus renders each line as:
+ *   div.lyrics-lyricsContainer-LyricsLine
+ *     p                 <- original
+ *     p (opacity: 0.5)  <- translation, only in "Below original" display mode
+ *
+ * Only the second <p> is restyled, so lines with no translation — and the
+ * whole UI when the gloss is off — are untouched.
+ */
+
+.lyrics-lyricsContainer-LyricsLine > p:nth-of-type(2) {
+	font-size: 0.55em;
+	line-height: 1.25;
+	font-weight: 400;
+	letter-spacing: 0.01em;
+	margin-top: 0.2em;
+	opacity: 0.6 !important; /* beats the inline opacity: 0.5 lyrics-plus sets */
+}
+
+/* The active line gets a slightly stronger gloss so it stays readable at a
+ * glance without competing with the original. */
+.lyrics-lyricsContainer-LyricsLine-active > p:nth-of-type(2) {
+	opacity: 0.8 !important;
+}
