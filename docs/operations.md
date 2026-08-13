@@ -246,9 +246,13 @@ localStorage.
 line, no snap to the top.
 
 **Cause:** hiding the scrollbar with `display: none`, `width: 0` or
-`scrollbar-width: none`. Spotify's main view is a managed scroll container and
-those properties change the scrollbar's measured geometry, which can stop the
-container scrolling at all.
+`scrollbar-width: none`. Spotify uses the OverlayScrollbars library, which
+measures the native scrollbar in order to lay out its own — so zeroing that
+geometry breaks its calculations and the container stops scrolling.
+
+Note also that the visible scrollbar is **not** `::-webkit-scrollbar`. It is a
+set of real DOM elements (`.os-scrollbar`, `.os-scrollbar-handle`,
+`.os-scrollbar-track`), so styling the pseudo-element does nothing at all.
 
 **Fix:** hide it by paint only — transparent background on
 `::-webkit-scrollbar` and its thumb. Never touch its size. If the lyrics ever

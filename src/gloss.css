@@ -56,19 +56,22 @@
  *
  * The `lyric-gloss-route` class is toggled on <html> by lyric-gloss-playbar.js.
  */
-/* Make it invisible, never absent. `display: none`, `width: 0` and
- * `scrollbar-width: none` all change the scrollbar's measured geometry, and
- * Spotify's main view is a managed scroll container — zeroing it stopped the
- * page scrolling at all. Only paint is touched here; every box keeps its size.
+/* Spotify draws its scrollbar with OverlayScrollbars — real DOM elements
+ * (.os-scrollbar and friends), not the native `::-webkit-scrollbar`. Styling
+ * the pseudo-element does nothing here.
+ *
+ * It must be hidden by PAINT ONLY. OverlayScrollbars measures the native
+ * scrollbar to lay itself out, so `display: none` / `width: 0` /
+ * `scrollbar-width: none` break its calculations and stop the page scrolling
+ * altogether. `opacity` changes nothing it measures.
+ *
+ * pointer-events is dropped too, so an invisible bar can't swallow clicks near
+ * the right edge. The wheel still scrolls; only dragging the (unseen) handle
+ * goes away.
  */
-html.lyric-gloss-route ::-webkit-scrollbar,
-html.lyric-gloss-route ::-webkit-scrollbar-track,
-html.lyric-gloss-route ::-webkit-scrollbar-corner {
-	background: transparent !important;
-}
-
-html.lyric-gloss-route ::-webkit-scrollbar-thumb {
-	background: transparent !important;
-	border-color: transparent !important;
-	box-shadow: none !important;
+html.lyric-gloss-route .os-scrollbar,
+html.lyric-gloss-route .os-scrollbar-handle,
+html.lyric-gloss-route .os-scrollbar-track {
+	opacity: 0 !important;
+	pointer-events: none !important;
 }

@@ -122,8 +122,10 @@ and the first line starts within 300ms, which is exactly the state at the start
 of a track.
 
 The page scrolls Spotify's shared main-view container, not anything lyrics-plus
-owns, so its scrollbar cannot be styled from the lyrics container. It is hidden by
-paint only — a transparent thumb and track. Removing it with `display: none` or
+owns, so its scrollbar cannot be styled from the lyrics container. It is also not a native
+scrollbar: Spotify uses OverlayScrollbars, which renders real DOM elements
+(`.os-scrollbar` and friends), so `::-webkit-scrollbar` rules are inert. It is
+hidden with `opacity: 0` — paint only. Removing it with `display: none` or
 zeroing its width stops the container scrolling altogether, since its geometry
 feeds Spotify's own scroll handling. The
 extension marks `<html>` with `lyric-gloss-route` while the route is open and
