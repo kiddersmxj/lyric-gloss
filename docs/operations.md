@@ -150,3 +150,35 @@ upgrade runs before patching.
 but never *applied*, downgrading it to that original version reintroduces this
 incompatibility — the old version was only ever fine because nothing was using
 it.
+
+## No translations, and no menu to fix it
+
+**Symptom:** the gloss never appears, and the translation menu is hidden so
+there is nothing to click.
+
+**Cause:** a stale value in localStorage. `CONFIG.visual` reads
+`localStorage.getItem(...) || "<default>"`, so a patched *default* is ignored
+whenever a value already exists — and `translate:translated-lyrics-source` is
+left at `"none"` by any earlier run or cache clear. Hiding the menu then
+removes the only way to change it.
+
+**Fix:** these values are now **forced** in the patched source, not defaulted:
+
+```js
+"translate:translated-lyrics-source": "autoTranslation:en",
+"translate:display-mode": "below",
+"synced-compact": false,
+alignment: "left",
+locked: "1",
+```
+
+Rule of thumb: if the UI for a setting is hidden, the value must be forced. A
+default plus a hidden menu is a dead end.
+
+## Hiding UI by class name
+
+Spotify moves its nav entry for custom apps between builds — it has been a list
+item, a link and a button — so CSS written against a guessed class name
+silently stops working. `lyric-gloss-playbar.js` finds it by what it points at
+(`[href="/lyrics-plus"]`, `[data-id="/lyrics-plus"]`) and walks up to the
+nearest `li`/listitem, which survives those changes.

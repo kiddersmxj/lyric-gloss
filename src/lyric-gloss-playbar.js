@@ -41,20 +41,31 @@
 	// front. If there is no button to hijack, the nav entry stays as the way
 	// in; hiding it unconditionally is how you end up unable to open lyrics
 	// at all.
-	let sidebarHidden = false;
+	let navHidden = false;
 
-	function hideSidebarEntry() {
-		if (sidebarHidden) return;
-		sidebarHidden = true;
-		const style = document.createElement("style");
-		// Spotify has used both a data-id list item and a plain nav link.
-		style.innerHTML = `
-			li[data-id="${ROUTE}"],
-			li:has(> a[href="${ROUTE}"]),
-			a[href="${ROUTE}"] {
-				display: none !important;
-			}`;
-		document.head.appendChild(style);
+	// Find the nav entry by what it points at rather than by class name, then
+	// walk up to the element that actually occupies space. Guessing selectors
+	// failed repeatedly — Spotify moves this thing between builds and it has
+	// been a list item, a link, and a button.
+	function hideNavEntry() {
+		const anchors = document.querySelectorAll(`[href="${ROUTE}"], [href="#${ROUTE}"], [data-id="${ROUTE}"], [aria-label="Lyrics Plus"]`);
+		let hid = 0;
+
+		for (const anchor of anchors) {
+			// Don't ever hide something containing the playbar button we bound.
+			if (anchor.querySelector?.(`[${MARK}]`)) continue;
+
+			const item = anchor.closest("li, [role='listitem'], [role='tab']") ?? anchor;
+			if (item.dataset.lyricGlossHidden) continue;
+			item.dataset.lyricGlossHidden = "1";
+			item.style.setProperty("display", "none", "important");
+			hid++;
+		}
+
+		if (hid && !navHidden) {
+			navHidden = true;
+			console.log(`[lyric-gloss] hid ${hid} nav entr${hid === 1 ? "y" : "ies"} for ${ROUTE}`);
+		}
 	}
 
 	function toggleLyrics(event) {
@@ -82,7 +93,7 @@
 
 		button.setAttribute(MARK, "1");
 		button.addEventListener("click", toggleLyrics, true); // capture phase
-		hideSidebarEntry(); // safe now: there is a working way in
+		hideNavEntry(); // safe now: there is a working way in
 	}
 
 	bind();
@@ -92,7 +103,10 @@
 	// wrong one: the progress bar mutates every frame, so a subtree observer
 	// fires continuously. A cheap poll is predictable and costs nothing —
 	// bind() returns immediately once the current element is marked.
-	setInterval(bind, 1000);
+	setInterval(() => {
+		bind();
+		if (findButton()) hideNavEntry(); // only ever hide when a way in exists
+	}, 1000);
 
 	console.log("[lyric-gloss] playbar lyrics button bound to", ROUTE);
 })();
