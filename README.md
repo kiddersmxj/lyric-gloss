@@ -65,4 +65,6 @@ only has translations a human contributed, for a small minority of tracks.
 ## Docs
 
 - [SPEC.md](SPEC.md) — how it works and why it's built this way
-- [docs/operations.md](docs/operations.md) — gotchas, with symptoms
+- [docs/operations.md](docs/operations.md) — failure modes, each with its symptom
+- [docs/development.md](docs/development.md) — layout, commands, testing, conventions
+- [CLAUDE.md](CLAUDE.md) — orientation for agents, and the invariants not to break
