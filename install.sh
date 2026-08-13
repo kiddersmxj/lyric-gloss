@@ -16,6 +16,9 @@ SPICETIFY="$SPICE_HOME/spicetify"
 [[ -x $SPICETIFY ]] || { echo "spicetify not found at $SPICETIFY" >&2; exit 1; }
 
 echo "==> patching lyrics-plus"
+# Remove first so re-running picks up changes to the patch set rather than
+# short-circuiting on "already patched".
+python3 "$HERE/patch.py" remove "$SPICE_HOME" >/dev/null 2>&1 || true
 python3 "$HERE/patch.py" apply "$SPICE_HOME"
 
 echo "==> installing gloss theme"
@@ -30,6 +33,10 @@ echo "==> configuring spicetify"
 # auto-advance in a way that survives every obvious revert. See SPEC.md.
 "$SPICETIFY" config experimental_features 0 >/dev/null
 "$SPICETIFY" config always_enable_devtools 0 >/dev/null
+# Stops the "a new version of Spicetify is available" banner appearing in the
+# client. Upgrades are a deliberate act here — they wipe CustomApps/ and need
+# install.sh re-run afterwards — so a nag in the UI is worse than useless.
+"$SPICETIFY" config check_spicetify_update 0 >/dev/null
 "$SPICETIFY" config custom_apps lyrics-plus >/dev/null
 "$SPICETIFY" config current_theme lyric-gloss replace_colors 0 >/dev/null
 

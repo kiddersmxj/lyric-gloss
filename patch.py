@@ -97,6 +97,29 @@ EDITS = [
         "\t\t\t\t\tneteaseTranslation: null,\n\t\t\t\t\t...tempState,",
         "\t\t\t\t\tneteaseTranslation: null,\n\t\t\t\t\tautoTranslation: null,\n\t\t\t\t\t...tempState,",
     ),
+    # Defaults, so a fresh install behaves correctly with no settings to find.
+    # These live in localStorage, which gets wiped whenever the translation
+    # cache is cleared — baking the defaults in means that doesn't undo them.
+    #
+    # Replace Spotify's own playbar lyrics button with ours. The extension
+    # already hides `.main-nowPlayingBar-lyricsButton` and the sidebar entry;
+    # it was just gated off by default.
+    (
+        "index.js",
+        '\t\t"playbar-button": getConfig("lyrics-plus:visual:playbar-button", false),',
+        '\t\t"playbar-button": getConfig("lyrics-plus:visual:playbar-button", true),',
+    ),
+    (
+        "PlaybarButton.js",
+        '\tif (Spicetify.LocalStorage.get("lyrics-plus:visual:playbar-button") === "true") setPlaybarButton();',
+        '\tif (Spicetify.LocalStorage.get("lyrics-plus:visual:playbar-button") !== "false") setPlaybarButton();',
+    ),
+    # Spotify's native lyrics are left-aligned; lyrics-plus centres by default.
+    (
+        "index.js",
+        '\t\talignment: localStorage.getItem("lyrics-plus:visual:alignment") || "center",',
+        '\t\talignment: localStorage.getItem("lyrics-plus:visual:alignment") || "left",',
+    ),
     # Textual, not a JSON round-trip: json.dumps would reformat the whole file
     # and `remove` could not restore it byte-for-byte.
     (
