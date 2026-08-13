@@ -63,14 +63,81 @@ chorus is skipped wholesale.
 the skip decision matters as much as caching translations; without it every
 same-language track re-requests on every play.
 
+## Rate limiting
+
+The endpoint is unofficial and throttles by IP, so the provider has to be a
+good citizen or it loses access for everyone using that address.
+
+The failure that mattered was not the throttling itself but the amplification:
+the per-line retry, which exists for a chunk that returns the wrong number of
+segments, also ran when the request itself failed. One 429 became one doomed
+request per line, dozens per song, repeated on every track change — which kept
+the limit alive indefinitely.
+
+Two rules follow. Retry only distinguishes recoverable from unrecoverable
+failure: a misaligned response is worth retrying line by line, a failed request
+is not. And repeated failure opens a circuit breaker — 2m, 10m, 30m, 2h while
+failures continue, reset by any clean run, persisted so a restart does not
+resume hammering. Cached tracks keep rendering throughout, and a throttled
+track caches nothing so it retries once the cooldown expires.
+
+## The playbar button and the nav entry
+
+The goal is that Spotify's own lyrics button opens this page, with no second
+control anywhere.
+
+lyrics-plus ships `PlaybarButton.js` for this, and it is not usable: it hides
+the native button *before* calling `Spicetify.Playbar.Button().register()`, so
+on a build where that API doesn't match you get no lyrics button at all. The
+extension instead binds a capture-phase click listener to Spotify's existing
+button. Nothing is hidden, so the worst failure is the button behaving as it
+always did.
+
+Two things make this harder than it looks:
+
+**The nav entry has no route in its markup.** It renders as a bare
+`<button aria-label="Lyrics">` — no `href`, no `data-id`. Nothing in the
+document references `/lyrics-plus` except the stylesheet link. It is identified
+by its icon instead: both `icon` and `active-icon` in the lyrics-plus manifest
+begin `m224.98` once whitespace is stripped, and nothing else in the client
+draws that path.
+
+**Spotify serves UI experiments per session,** so the playbar button does not
+always carry `data-testid="lyrics-button"`. Selectors must therefore be scoped
+to the container they belong to — `findButton()` searches the now-playing bar
+first and rejects anything matching the nav icon. An unscoped `aria-label`
+match would find the nav mic, since it sits higher in the DOM, and binding it
+made it unhideable.
+
+The nav entry is only ever hidden once a button has actually been bound, so a
+client where the hijack fails still has a way in.
+
+## Scrolling and the scrollbar
+
+Upstream follows the active line but does not return to the top when a new
+track starts, because the scroll effect keys off `lyrics[0].text` — often a
+pause marker, so consecutive tracks share an id and the effect never re-fires —
+and because it returns early without scrolling when the active line is index 0
+and the first line starts within 300ms, which is exactly the state at the start
+of a track.
+
+The page scrolls Spotify's shared main-view container, not anything lyrics-plus
+owns, so its scrollbar cannot be styled from the lyrics container. The
+extension marks `<html>` with `lyric-gloss-route` while the route is open and
+the stylesheet scopes the scrollbar rules to that, leaving every other page
+alone. That marking is cosmetic, so it runs last and inside `try`/`catch` —
+when it briefly ran first, a throw there silently disabled the button binding
+and the nav hiding.
+
 ## Quality
 
 Straight lines translate well. Slang goes literal:
 
-```
-Se me sube el ron y me pongo a pensar  →  "My rum rises and I start to think"
-Dime que sí, mami                      →  "Tell me yes, mommy"
-```
+Idiom is rendered literally. A colloquial "the drink is getting to me" comes
+back as a word-for-word reading about rising liquid; affectionate address is
+translated as a literal family term. Both are wrong in register rather than in
+vocabulary, which is the hard kind of wrong to notice if you are still learning
+the language.
 
 This is inherent to sentence-level MT on song lyrics, which are dense in
 regional slang, elision and deliberate ambiguity. The fix, if it matters, is

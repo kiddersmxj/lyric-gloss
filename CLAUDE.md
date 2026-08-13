@@ -46,6 +46,16 @@ already-patched trees forever. `RETIRED` is swept on both apply and remove.
 front, twice, left no way to open lyrics at all. `hideNavEntry()` runs only
 after `bind()` succeeds.
 
+**On failure, back off — never retry harder.** Two separate incidents came
+from error handling that amplified a problem: a `catch` that cleared the
+request key and re-fired on every render tick, and a per-line retry that ran
+when the request itself had failed. Retry only where the failure is genuinely
+recoverable, and put a circuit breaker behind anything hitting the network.
+
+**Selectors must be scoped to their container.** Spotify serves UI experiments
+per session, so an element that matches on one launch can match something else
+on the next. This is what made the nav mic bind itself as the playbar button.
+
 **Cosmetic code goes last, in `try`/`catch`.** The extension is one IIFE, so
 anything that throws stops everything after it. The route-class block was
 briefly placed before `bind()` and silently disabled the button binding and the

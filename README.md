@@ -15,8 +15,11 @@ beneath each line — it just has no general translation source. This adds one.
 | Below-original styling | working — 0.55em, dimmed, active line brighter |
 | Same-language skip | working — detects and skips, one request per track, cached |
 | Cache | working — 30 days, per track + target, in localStorage |
-| Playbar button | replaces Spotify's native lyrics button, by default |
 | Re-apply after `spicetify upgrade` | `install.sh`, re-runnable, refuses on upstream drift |
+| Rate limiting | circuit breaker, 2m→2h backoff, persisted |
+| Playbar button | Spotify's own lyrics button opens this page |
+| Scroll | follows the active line, snaps to top on track change |
+| Scrollbar | hidden on the lyrics route only |
 | Translation quality | adequate for prose, literal on slang — see SPEC.md |
 
 ## Install
