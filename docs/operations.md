@@ -239,3 +239,18 @@ already-cached tracks keep rendering throughout.
 **If you are throttled right now,** wait it out — nothing is broken. To clear
 the breaker manually, remove `lyrics-plus:auto-translate:cooldown` from
 localStorage.
+
+## Lyrics stop scrolling entirely
+
+**Symptom:** lines change but the page never moves — no following the active
+line, no snap to the top.
+
+**Cause:** hiding the scrollbar with `display: none`, `width: 0` or
+`scrollbar-width: none`. Spotify's main view is a managed scroll container and
+those properties change the scrollbar's measured geometry, which can stop the
+container scrolling at all.
+
+**Fix:** hide it by paint only — transparent background on
+`::-webkit-scrollbar` and its thumb. Never touch its size. If the lyrics ever
+stop scrolling again, look at `gloss.css` first: scrolling matters more than
+the scrollbar being invisible, so delete those rules rather than tolerate it.

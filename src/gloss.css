@@ -56,15 +56,19 @@
  *
  * The `lyric-gloss-route` class is toggled on <html> by lyric-gloss-playbar.js.
  */
+/* Make it invisible, never absent. `display: none`, `width: 0` and
+ * `scrollbar-width: none` all change the scrollbar's measured geometry, and
+ * Spotify's main view is a managed scroll container — zeroing it stopped the
+ * page scrolling at all. Only paint is touched here; every box keeps its size.
+ */
 html.lyric-gloss-route ::-webkit-scrollbar,
-html.lyric-gloss-route ::-webkit-scrollbar-thumb,
-html.lyric-gloss-route ::-webkit-scrollbar-track {
-	display: none !important;
-	width: 0 !important;
-	height: 0 !important;
+html.lyric-gloss-route ::-webkit-scrollbar-track,
+html.lyric-gloss-route ::-webkit-scrollbar-corner {
+	background: transparent !important;
 }
 
-html.lyric-gloss-route,
-html.lyric-gloss-route * {
-	scrollbar-width: none !important;
+html.lyric-gloss-route ::-webkit-scrollbar-thumb {
+	background: transparent !important;
+	border-color: transparent !important;
+	box-shadow: none !important;
 }
