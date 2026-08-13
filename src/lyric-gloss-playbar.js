@@ -29,10 +29,26 @@
 		'button[title*="yric"]',
 	];
 
+	// Never return the lyrics-plus nav entry. Spotify does not always tag the
+	// playbar button with data-testid — it varies between launches, since UI
+	// experiments are served per session — and the aria-label fallback matches
+	// the nav mic first, because it sits higher in the DOM. Binding that marks
+	// it, and hideNavEntry() skips marked elements, so the mic made itself
+	// immune to hiding on exactly those launches.
+	//
+	// Search inside the now-playing bar first, and reject the nav entry by its
+	// icon in any case.
 	function findButton() {
-		for (const selector of SELECTORS) {
-			const el = document.querySelector(selector);
-			if (el) return el;
+		const bar = document.querySelector(".Root__now-playing-bar, .main-nowPlayingBar-nowPlayingBar, footer");
+
+		for (const scope of [bar, document]) {
+			if (!scope) continue;
+			for (const selector of SELECTORS) {
+				for (const el of scope.querySelectorAll(selector)) {
+					if (isNavEntry(el)) continue;
+					return el;
+				}
+			}
 		}
 		return null;
 	}
@@ -63,7 +79,10 @@
 		let hid = 0;
 
 		for (const el of document.querySelectorAll("button, a, li")) {
-			if (el.hasAttribute(MARK) || !isNavEntry(el)) continue;
+			// Deliberately no MARK check: findButton() can no longer return a
+			// nav entry, so hiding always wins. The old guard meant that if the
+			// mic ever got bound by mistake it silently became unhideable.
+			if (!isNavEntry(el)) continue;
 
 			const item = el.closest("li, [role='listitem']") ?? el;
 			if (item.dataset.lyricGlossHidden) continue;

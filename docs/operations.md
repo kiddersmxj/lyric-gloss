@@ -197,3 +197,24 @@ scrolling if the first line starts within 300 ms.
 
 **Fix:** the patch includes the track URI in the id, and drops the early
 return.
+
+## Mic entry comes back on some launches but not others
+
+**Symptom:** after a `spicetify apply` the nav mic is gone, then it reappears
+after restarting Spotify yourself — same files, same client, no reinstall.
+
+**Cause:** Spotify serves UI experiments per session, so the playbar lyrics
+button does not always carry `data-testid="lyrics-button"`. On launches where
+it doesn't, `findButton()` fell through to `button[aria-label*="yric"]`, which
+matches the **nav mic** first because it is higher in the DOM. Binding marked
+it, and `hideNavEntry()` skipped marked elements to avoid hiding the button it
+had just bound — so the mic made itself unhideable, on exactly those launches.
+
+**Fix:** `findButton()` searches inside the now-playing bar first and rejects
+anything matching the nav icon, so a nav entry can never be bound. The MARK
+guard in `hideNavEntry()` is gone as well: hiding now always wins.
+
+**General lesson:** anything that identifies an element by a label or test id
+should be scoped to the container it belongs to. Per-session UI experiments
+mean a selector that works on one launch can silently match something else on
+the next.
