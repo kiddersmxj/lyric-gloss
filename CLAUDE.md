@@ -46,6 +46,11 @@ already-patched trees forever. `RETIRED` is swept on both apply and remove.
 front, twice, left no way to open lyrics at all. `hideNavEntry()` runs only
 after `bind()` succeeds.
 
+**Cosmetic code goes last, in `try`/`catch`.** The extension is one IIFE, so
+anything that throws stops everything after it. The route-class block was
+briefly placed before `bind()` and silently disabled the button binding and the
+nav hiding. Critical path first; extras afterwards, guarded.
+
 **`/opt/spotify` is opened only for the apply.** `install.sh` restores
 `root:root` 755/644 via an `EXIT` trap. Never leave it world-writable.
 

@@ -106,19 +106,6 @@
 		hideNavEntry(); // safe now: there is a working way in
 	}
 
-	// Mark the document while the lyrics route is open, so the stylesheet can
-	// scope rules to it. The page scrolls Spotify's main view container, not
-	// anything lyrics-plus owns, so its scrollbar cannot be reached without
-	// this — and hiding it unscoped would strip scrollbars from every page.
-	const ROUTE_CLASS = "lyric-gloss-route";
-
-	function syncRouteClass(pathname) {
-		document.documentElement.classList.toggle(ROUTE_CLASS, pathname === ROUTE);
-	}
-
-	syncRouteClass(Spicetify.Platform.History.location?.pathname);
-	Spicetify.Platform.History.listen((location) => syncRouteClass(location?.pathname));
-
 	bind();
 
 	// Spotify replaces the playbar element (track changes, resize, PiP), which
@@ -130,6 +117,31 @@
 		bind();
 		if (findButton()) hideNavEntry(); // only ever hide when a way in exists
 	}, 1000);
+
+	// --- optional extras, strictly after the critical path ------------------
+	// Anything below is cosmetic. It runs last and inside try/catch so that a
+	// failure here can never stop the button binding or the nav hiding above,
+	// which is exactly what happened when this block sat before bind().
+	try {
+		// Mark the document while the lyrics route is open, so the stylesheet
+		// can scope rules to it. The page scrolls Spotify's main-view
+		// container, not anything lyrics-plus owns, so its scrollbar cannot be
+		// reached otherwise — and hiding it unscoped would strip scrollbars
+		// from every page in the client.
+		const ROUTE_CLASS = "lyric-gloss-route";
+		const syncRouteClass = (pathname) => document.documentElement.classList.toggle(ROUTE_CLASS, pathname === ROUTE);
+
+		syncRouteClass(Spicetify.Platform.History.location?.pathname);
+
+		if (typeof Spicetify.Platform.History.listen === "function") {
+			Spicetify.Platform.History.listen((location) => syncRouteClass(location?.pathname));
+		} else {
+			// No route events on this build — fall back to the existing poll.
+			setInterval(() => syncRouteClass(Spicetify.Platform.History.location?.pathname), 1000);
+		}
+	} catch (error) {
+		console.error("[lyric-gloss] route-class setup failed (scrollbar will show)", error);
+	}
 
 	console.log("[lyric-gloss] playbar lyrics button bound to", ROUTE);
 })();
