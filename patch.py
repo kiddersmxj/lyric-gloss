@@ -112,6 +112,31 @@ EDITS = [
         '\t\talignment: localStorage.getItem("lyrics-plus:visual:alignment") || "center",',
         '\t\talignment: localStorage.getItem("lyrics-plus:visual:alignment") || "left",',
     ),
+    # The whole point of the tool: auto-detected source, glossed underneath.
+    # Defaults rather than settings, so there is nothing to configure and
+    # clearing the cache can't silently turn the gloss off.
+    (
+        "index.js",
+        '\t\t"translate:translated-lyrics-source": localStorage.getItem("lyrics-plus:visual:translate:translated-lyrics-source") || "none",',
+        '\t\t"translate:translated-lyrics-source": localStorage.getItem("lyrics-plus:visual:translate:translated-lyrics-source") || "autoTranslation:en",',
+    ),
+    (
+        "index.js",
+        '\t\t"translate:display-mode": localStorage.getItem("lyrics-plus:visual:translate:display-mode") || "replace",',
+        '\t\t"translate:display-mode": localStorage.getItem("lyrics-plus:visual:translate:display-mode") || "below",',
+    ),
+    # Expanded view, not the compact one — compact defaults on upstream.
+    (
+        "index.js",
+        '\t\t"synced-compact": getConfig("lyrics-plus:visual:synced-compact"),',
+        '\t\t"synced-compact": getConfig("lyrics-plus:visual:synced-compact", false),',
+    ),
+    # Lock to synced (mode 1) so the karaoke/synced/unsynced tabs are moot.
+    (
+        "index.js",
+        '\tlocked: localStorage.getItem("lyrics-plus:lock-mode") || "-1",',
+        '\tlocked: localStorage.getItem("lyrics-plus:lock-mode") || "1",',
+    ),
     # Textual, not a JSON round-trip: json.dumps would reformat the whole file
     # and `remove` could not restore it byte-for-byte.
     (

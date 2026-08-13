@@ -37,16 +37,23 @@
 		return null;
 	}
 
-	// Hidden only after a successful navigation, never up front: if the route
-	// itself is broken, the sidebar entry stays as the way in. Hiding it
-	// unconditionally is how you end up with no way to open lyrics at all.
+	// Hidden only once a native button has actually been bound — never up
+	// front. If there is no button to hijack, the nav entry stays as the way
+	// in; hiding it unconditionally is how you end up unable to open lyrics
+	// at all.
 	let sidebarHidden = false;
 
 	function hideSidebarEntry() {
 		if (sidebarHidden) return;
 		sidebarHidden = true;
 		const style = document.createElement("style");
-		style.innerHTML = `li[data-id="${ROUTE}"] { display: none; }`;
+		// Spotify has used both a data-id list item and a plain nav link.
+		style.innerHTML = `
+			li[data-id="${ROUTE}"],
+			li:has(> a[href="${ROUTE}"]),
+			a[href="${ROUTE}"] {
+				display: none !important;
+			}`;
 		document.head.appendChild(style);
 	}
 
@@ -67,7 +74,6 @@
 
 		event.preventDefault();
 		event.stopImmediatePropagation(); // beat Spotify's own handler
-		hideSidebarEntry();
 	}
 
 	function bind() {
@@ -76,6 +82,7 @@
 
 		button.setAttribute(MARK, "1");
 		button.addEventListener("click", toggleLyrics, true); // capture phase
+		hideSidebarEntry(); // safe now: there is a working way in
 	}
 
 	bind();

@@ -29,16 +29,17 @@ Restart Spotify. The lyrics button on the playbar is now this app — Spotify's
 own lyrics button and the redundant sidebar entry are hidden, so there is one
 control, where you'd expect it.
 
-Two things still have to be chosen, because there is no sensible default for
-"which language do you want":
+There is nothing to configure. The patched defaults are: auto-translate to
+English, glossed below the original, source language auto-detected, mode
+locked to synced, expanded view, left-aligned. All baked into the source
+rather than written to localStorage, so clearing the translation cache can't
+silently undo them.
 
-- **Translation Provider** → `<language> (auto-translate)`
-- **Translation Display** → `Below original`
+The lyrics-plus chrome is hidden to match — the karaoke/synced/unsynced tabs,
+the translation and adjustment menus, the cache button, and the sidebar entry
+(once the playbar button is confirmed bound).
 
-Everything else is set by the patch: the playbar button replaces the native
-one, and alignment is left rather than lyrics-plus's centre, to match Spotify.
-These are baked into the source rather than written to localStorage, so
-clearing the translation cache doesn't silently undo them.
+To change any of it, edit the defaults in `patch.py` and re-run `install.sh`.
 
 Re-run `./install.sh` after any `spicetify upgrade` or Spotify package upgrade —
 both replace the files this patches. Re-running is safe: it unpatches first, so

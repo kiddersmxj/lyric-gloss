@@ -23,3 +23,28 @@
 .lyrics-lyricsContainer-LyricsLine-active > p:nth-of-type(2) {
 	opacity: 0.8 !important;
 }
+
+/* --- chrome removal ---------------------------------------------------
+ * Everything below hides lyrics-plus UI that this setup has no use for.
+ * All of it is driven by defaults baked into the patched source instead,
+ * so hiding the controls doesn't strand you with the wrong behaviour.
+ */
+
+/* Karaoke / Synced / Unsynced tabs and their headings. The mode is locked to
+ * synced in the patched defaults, so these only offered ways to break it. */
+.lyrics-tabBar,
+.lyrics-tabBar-nav,
+.lyrics-tabBar-header {
+	display: none !important;
+}
+
+/* Translation menu, adjustments menu and the cache button, top-right of the
+ * lyrics page. Provider and display mode are patched defaults now. */
+.lyrics-config-button-container {
+	display: none !important;
+}
+
+/* Reclaim the space the tab bar occupied. */
+.lyrics-lyricsContainer-LyricsContainer {
+	padding-top: 0;
+}
