@@ -99,12 +99,6 @@ to defaults, including Translation Provider (`none`) and Translation Display
 again. Symptom: everything verifies as present in the client, but no gloss
 appears.
 
-Related: `PULSE_LATENCY_MSEC=60`, the workaround for Spotify's SIGFPE when
-PipeWire reports zero latency during sink transitions, is exported from
-`.bashrc` and therefore only reaches Spotify when launched from an interactive
-shell. Launching from dmenu bypasses it entirely. Move it to `~/.xprofile` if
-that bug ever resurfaces.
-
 ## No lyrics button at all
 
 **Symptom:** after an install, there is no lyrics button on the playbar —
