@@ -182,3 +182,18 @@ item, a link and a button — so CSS written against a guessed class name
 silently stops working. `lyric-gloss-playbar.js` finds it by what it points at
 (`[href="/lyrics-plus"]`, `[data-id="/lyrics-plus"]`) and walks up to the
 nearest `li`/listitem, which survives those changes.
+
+## New song doesn't scroll back to the top
+
+**Symptom:** a track ends, the next one's lyrics load, and the page stays
+scrolled wherever the previous song finished instead of snapping to the current
+line the way Spotify's native pane does.
+
+**Cause:** two things in `SyncedExpandedLyricsPage`. The scroll effect keys off
+`lyrics[0].text`, and a track's first entry is very often a pause marker — so
+consecutive tracks share an id and the effect never re-fires. Separately, when
+the active line is index 0 (i.e. a new track) upstream returns early without
+scrolling if the first line starts within 300 ms.
+
+**Fix:** the patch includes the track URI in the id, and drops the early
+return.

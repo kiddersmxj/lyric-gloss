@@ -137,6 +137,48 @@ EDITS = [
         '\tlocked: localStorage.getItem("lyrics-plus:lock-mode") || "-1",',
         '\tlocked: "1",',
     ),
+    # --- auto-scroll to the current line on track change --------------------
+    # Two upstream bugs stop the expanded page snapping to the top when the
+    # next song's lyrics load, the way Spotify's native pane does.
+    #
+    # 1. The scroll effect keys off `lyrics[0].text`, and a track's first entry
+    #    is very often a pause marker. Consecutive tracks then share the same
+    #    id and the effect never re-fires. Including the track URI makes it
+    #    genuinely unique per song.
+    (
+        "Pages.js",
+        "\t// Reset scroll state when lyrics change\n"
+        "\tuseEffect(() => {\n"
+        "\t\tinitialScroll.current = true;\n"
+        "\t}, [lyrics]);\n"
+        "\n"
+        "\tconst lyricsId = lyrics[0].text;",
+        "\t// Reset scroll state when lyrics change\n"
+        "\tuseEffect(() => {\n"
+        "\t\tinitialScroll.current = true;\n"
+        "\t}, [lyrics]);\n"
+        "\n"
+        "\t// Track URI included deliberately: lyrics[0].text is often a pause\n"
+        "\t// marker, so consecutive tracks share it and the scroll effect below\n"
+        "\t// never re-fires — leaving the new song scrolled wherever the last\n"
+        "\t// one ended.\n"
+        "\tconst lyricsId = `${Spicetify.Player?.data?.item?.uri ?? \"\"}::${lyrics[0].text}`;",
+    ),
+    # 2. On a new track the active line is index 0, and upstream returns early
+    #    without scrolling whenever the first line starts soon. That is exactly
+    #    the case where the page most needs to snap back to the top.
+    (
+        "Pages.js",
+        "\t\t\t\t// If the intro is very short (e.g. less than 300ms), don't focus it\n"
+        "\t\t\t\tif (nextStart && nextStart - position < 300) {\n"
+        "\t\t\t\t\tinitialScroll.current = false;\n"
+        "\t\t\t\t\treturn;\n"
+        "\t\t\t\t}",
+        "\t\t\t\t// Upstream bailed out here for short intros, which left a new\n"
+        "\t\t\t\t// track scrolled to wherever the previous one finished. Always\n"
+        "\t\t\t\t// scroll — snapping to the top is the whole point.\n"
+        "\t\t\t\tvoid nextStart;",
+    ),
     # Textual, not a JSON round-trip: json.dumps would reformat the whole file
     # and `remove` could not restore it byte-for-byte.
     (
