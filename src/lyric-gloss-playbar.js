@@ -43,19 +43,29 @@
 	// at all.
 	let navHidden = false;
 
-	// Find the nav entry by what it points at rather than by class name, then
-	// walk up to the element that actually occupies space. Guessing selectors
-	// failed repeatedly — Spotify moves this thing between builds and it has
-	// been a list item, a link, and a button.
+	// lyrics-plus's nav entry is identified by its ICON, not by the route.
+	// Verified against the live DOM: it renders as
+	//     <button aria-label="Lyrics"> …  no href, no data-id
+	// so every route-based selector misses it, and aria-label="Lyrics" alone
+	// would also match Spotify's playbar button and hide the thing we want.
+	//
+	// The icon is the manifest's own artwork, and nothing else in the client
+	// uses it. Both the icon and active-icon paths begin "m224.98" once
+	// whitespace is stripped and case is folded.
+	const NAV_ICON = "m224.98";
+
+	function isNavEntry(el) {
+		const d = el.querySelector?.("svg path")?.getAttribute("d") ?? "";
+		return d.replace(/\s+/g, "").toLowerCase().startsWith(NAV_ICON);
+	}
+
 	function hideNavEntry() {
-		const anchors = document.querySelectorAll(`[href="${ROUTE}"], [href="#${ROUTE}"], [data-id="${ROUTE}"], [aria-label="Lyrics Plus"]`);
 		let hid = 0;
 
-		for (const anchor of anchors) {
-			// Don't ever hide something containing the playbar button we bound.
-			if (anchor.querySelector?.(`[${MARK}]`)) continue;
+		for (const el of document.querySelectorAll("button, a, li")) {
+			if (el.hasAttribute(MARK) || !isNavEntry(el)) continue;
 
-			const item = anchor.closest("li, [role='listitem'], [role='tab']") ?? anchor;
+			const item = el.closest("li, [role='listitem']") ?? el;
 			if (item.dataset.lyricGlossHidden) continue;
 			item.dataset.lyricGlossHidden = "1";
 			item.style.setProperty("display", "none", "important");
@@ -64,7 +74,7 @@
 
 		if (hid && !navHidden) {
 			navHidden = true;
-			console.log(`[lyric-gloss] hid ${hid} nav entr${hid === 1 ? "y" : "ies"} for ${ROUTE}`);
+			console.log(`[lyric-gloss] hid ${hid} nav entr${hid === 1 ? "y" : "ies"}`);
 		}
 	}
 
