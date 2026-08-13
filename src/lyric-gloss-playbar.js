@@ -37,16 +37,37 @@
 		return null;
 	}
 
+	// Hidden only after a successful navigation, never up front: if the route
+	// itself is broken, the sidebar entry stays as the way in. Hiding it
+	// unconditionally is how you end up with no way to open lyrics at all.
+	let sidebarHidden = false;
+
+	function hideSidebarEntry() {
+		if (sidebarHidden) return;
+		sidebarHidden = true;
+		const style = document.createElement("style");
+		style.innerHTML = `li[data-id="${ROUTE}"] { display: none; }`;
+		document.head.appendChild(style);
+	}
+
 	function toggleLyrics(event) {
+		const history = Spicetify.Platform.History;
+
+		try {
+			if (history.location?.pathname === ROUTE) {
+				history.goBack();
+			} else {
+				history.push(ROUTE);
+			}
+		} catch (error) {
+			// Let Spotify's own handler run rather than swallowing the click.
+			console.error("[lyric-gloss] navigation failed, falling back", error);
+			return;
+		}
+
 		event.preventDefault();
 		event.stopImmediatePropagation(); // beat Spotify's own handler
-
-		const history = Spicetify.Platform.History;
-		if (history.location?.pathname === ROUTE) {
-			history.goBack();
-		} else {
-			history.push(ROUTE);
-		}
+		hideSidebarEntry();
 	}
 
 	function bind() {
@@ -59,18 +80,12 @@
 
 	bind();
 
-	// Spotify re-renders the playbar (track changes, window resize, PiP), which
-	// replaces the element and drops the listener. Re-bind whenever that happens.
-	const bar = document.querySelector(".Root__now-playing-bar, .main-nowPlayingBar-nowPlayingBar") ?? document.body;
-	new MutationObserver(bind).observe(bar, { childList: true, subtree: true });
-
-	// The sidebar entry is redundant once the playbar button works, but only
-	// hide it after we have actually bound something.
-	if (findButton()) {
-		const style = document.createElement("style");
-		style.innerHTML = `li[data-id="${ROUTE}"] { display: none; }`;
-		document.head.appendChild(style);
-	}
+	// Spotify replaces the playbar element (track changes, resize, PiP), which
+	// drops the listener. A MutationObserver here is the obvious choice and the
+	// wrong one: the progress bar mutates every frame, so a subtree observer
+	// fires continuously. A cheap poll is predictable and costs nothing —
+	// bind() returns immediately once the current element is marked.
+	setInterval(bind, 1000);
 
 	console.log("[lyric-gloss] playbar lyrics button bound to", ROUTE);
 })();

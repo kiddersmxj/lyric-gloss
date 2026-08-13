@@ -122,3 +122,31 @@ shipped and later dropped would otherwise be stranded in an already-patched tree
 forever, because `remove` no longer recognises it and `apply` sees the file as
 already patched. Anything retired must be moved to `RETIRED`, which is swept on
 both apply and remove.
+
+## "Something went wrong" on the lyrics page, and crashes
+
+**Symptom:** clicking the lyrics button shows Spotify's error page, and the
+client sometimes crashes outright.
+
+**Cause:** spicetify older than the installed Spotify. `lyrics-plus` is built
+against a known set of client internals, so an older spicetify rendering a
+newer Spotify throws inside the route.
+
+| spicetify | supports up to |
+|---|---|
+| 2.42.7 | pre-1.2.86 |
+| 2.43.0 | 1.2.86 |
+| 2.44.0 | 1.2.93 |
+
+**Check first:** `spicetify -v` against the Spotify version in
+`~/.config/spotify/prefs` (`app.last-launched-version`). If spicetify is older
+than Spotify, that is almost certainly it.
+
+`install.sh` now refuses to proceed on anything below 2.44.0 and upgrades
+first. Note that `spicetify upgrade` wipes `CustomApps/`, which is why the
+upgrade runs before patching.
+
+**Beware of "reverting to how it was".** If spicetify was previously installed
+but never *applied*, downgrading it to that original version reintroduces this
+incompatibility — the old version was only ever fine because nothing was using
+it.

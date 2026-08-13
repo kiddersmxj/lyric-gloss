@@ -15,6 +15,18 @@ SPICETIFY="$SPICE_HOME/spicetify"
 
 [[ -x $SPICETIFY ]] || { echo "spicetify not found at $SPICETIFY" >&2; exit 1; }
 
+# Spicetify must be new enough for the installed Spotify, or lyrics-plus throws
+# "Something went wrong" on the lyrics route and can take the client down with
+# it. 2.43.0 added 1.2.86, 2.44.0 added 1.2.93. A spicetify older than your
+# Spotify is the thing to suspect first.
+MIN_SPICETIFY=2.44.0
+have=$("$SPICETIFY" -v | tr -d '[:space:]')
+if [[ $(printf '%s\n%s\n' "$MIN_SPICETIFY" "$have" | sort -V | head -1) != "$MIN_SPICETIFY" ]]; then
+	echo "==> spicetify $have is older than $MIN_SPICETIFY — upgrading"
+	"$SPICETIFY" upgrade || true          # wipes CustomApps/; we patch after
+	echo "    now $("$SPICETIFY" -v | tr -d '[:space:]')"
+fi
+
 echo "==> patching lyrics-plus"
 # Remove first so re-running picks up changes to the patch set rather than
 # short-circuiting on "already patched".
