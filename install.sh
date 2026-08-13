@@ -26,6 +26,10 @@ mkdir -p "$SPICE_HOME/Themes/lyric-gloss"
 cp "$HERE/src/gloss.css" "$SPICE_HOME/Themes/lyric-gloss/user.css"
 printf '[Base]\n' > "$SPICE_HOME/Themes/lyric-gloss/color.ini"
 
+echo "==> installing playbar extension"
+mkdir -p "$SPICE_HOME/Extensions"
+cp "$HERE/src/lyric-gloss-playbar.js" "$SPICE_HOME/Extensions/"
+
 echo "==> configuring spicetify"
 # experimental_features MUST stay 0. At 1, apply writes ~258 Spotify feature
 # flags into localStorage (key: spicetify-exp-features), including playback
@@ -38,6 +42,7 @@ echo "==> configuring spicetify"
 # install.sh re-run afterwards — so a nag in the UI is worse than useless.
 "$SPICETIFY" config check_spicetify_update 0 >/dev/null
 "$SPICETIFY" config custom_apps lyrics-plus >/dev/null
+"$SPICETIFY" config extensions lyric-gloss-playbar.js >/dev/null
 "$SPICETIFY" config current_theme lyric-gloss replace_colors 0 >/dev/null
 
 echo "==> applying (needs sudo to write $SPOTIFY_DIR)"
@@ -63,12 +68,12 @@ echo "==> verifying"
 fail=0
 grep -rq ProviderAutoTranslate "$SPOTIFY_DIR/Apps/xpui/" || { echo "  MISSING: translation provider" >&2; fail=1; }
 grep -q "nth-of-type(2)" "$SPOTIFY_DIR/Apps/xpui/user.css" || { echo "  MISSING: gloss stylesheet" >&2; fail=1; }
-grep -rq 'playbar-button") !== "false"' "$SPOTIFY_DIR/Apps/xpui/" || { echo "  MISSING: playbar button default" >&2; fail=1; }
+grep -rq "data-lyric-gloss-bound" "$SPOTIFY_DIR/Apps/xpui/" || { echo "  MISSING: playbar extension" >&2; fail=1; }
 if ((fail)); then
 	echo "  apply did not land — the client is unchanged. Nothing above is installed." >&2
 	exit 1
 fi
-echo "  provider, stylesheet and playbar button all present in the client"
+echo "  provider, stylesheet and playbar extension all present in the client"
 
 echo
 echo "Done. Restart Spotify. The playbar lyrics button is now this app."

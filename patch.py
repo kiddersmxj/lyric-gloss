@@ -97,24 +97,16 @@ EDITS = [
         "\t\t\t\t\tneteaseTranslation: null,\n\t\t\t\t\t...tempState,",
         "\t\t\t\t\tneteaseTranslation: null,\n\t\t\t\t\tautoTranslation: null,\n\t\t\t\t\t...tempState,",
     ),
-    # Defaults, so a fresh install behaves correctly with no settings to find.
-    # These live in localStorage, which gets wiped whenever the translation
-    # cache is cleared — baking the defaults in means that doesn't undo them.
+    # NOTE: lyrics-plus's own PlaybarButton.js is deliberately left OFF. It
+    # appends a stylesheet hiding the native lyrics button *before* calling
+    # Spicetify.Playbar.Button().register(), so when that API doesn't match the
+    # running Spotify build you end up with no lyrics button at all. The
+    # lyric-gloss-playbar extension hijacks the native button instead, which
+    # cannot fail that way. See docs/operations.md.
     #
-    # Replace Spotify's own playbar lyrics button with ours. The extension
-    # already hides `.main-nowPlayingBar-lyricsButton` and the sidebar entry;
-    # it was just gated off by default.
-    (
-        "index.js",
-        '\t\t"playbar-button": getConfig("lyrics-plus:visual:playbar-button", false),',
-        '\t\t"playbar-button": getConfig("lyrics-plus:visual:playbar-button", true),',
-    ),
-    (
-        "PlaybarButton.js",
-        '\tif (Spicetify.LocalStorage.get("lyrics-plus:visual:playbar-button") === "true") setPlaybarButton();',
-        '\tif (Spicetify.LocalStorage.get("lyrics-plus:visual:playbar-button") !== "false") setPlaybarButton();',
-    ),
     # Spotify's native lyrics are left-aligned; lyrics-plus centres by default.
+    # This default is baked into the source because localStorage is wiped
+    # whenever the translation cache is cleared.
     (
         "index.js",
         '\t\talignment: localStorage.getItem("lyrics-plus:visual:alignment") || "center",',
@@ -141,6 +133,32 @@ EDITS = [
 ]
 
 
+# Edits this patch set used to make and no longer does. `remove` only knows how
+# to reverse the current EDITS, so without this a shipped-then-retired edit
+# would be stranded in an already-patched tree forever. (patched, original)
+RETIRED = [
+    (
+        "index.js",
+        '\t\t"playbar-button": getConfig("lyrics-plus:visual:playbar-button", true),',
+        '\t\t"playbar-button": getConfig("lyrics-plus:visual:playbar-button", false),',
+    ),
+    (
+        "PlaybarButton.js",
+        '\tif (Spicetify.LocalStorage.get("lyrics-plus:visual:playbar-button") !== "false") setPlaybarButton();',
+        '\tif (Spicetify.LocalStorage.get("lyrics-plus:visual:playbar-button") === "true") setPlaybarButton();',
+    ),
+]
+
+
+def undo_retired(app: Path) -> None:
+    for name, patched, original in RETIRED:
+        path = app / name
+        text = path.read_text()
+        if patched in text:
+            path.write_text(text.replace(patched, original))
+            print(f"  reverted retired edit in {name}")
+
+
 def app_dir(root: Path) -> Path:
     path = root / "CustomApps" / "lyrics-plus"
     if not path.is_dir():
@@ -153,6 +171,8 @@ def is_patched(app: Path) -> bool:
 
 
 def apply(app: Path) -> None:
+    undo_retired(app)
+
     if is_patched(app):
         print("already patched — nothing to do")
         return
@@ -174,6 +194,8 @@ def apply(app: Path) -> None:
 
 
 def remove(app: Path) -> None:
+    undo_retired(app)
+
     if not is_patched(app):
         print("not patched — nothing to do")
         return

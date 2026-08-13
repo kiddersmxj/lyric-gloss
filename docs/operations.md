@@ -104,3 +104,27 @@ PipeWire reports zero latency during sink transitions, is exported from
 `.bashrc` and therefore only reaches Spotify when launched from an interactive
 shell. Launching from dmenu bypasses it entirely. Move it to `~/.xprofile` if
 that bug ever resurfaces.
+
+## No lyrics button at all
+
+**Symptom:** after an install, there is no lyrics button on the playbar —
+neither Spotify's nor one from lyrics-plus.
+
+**Cause:** lyrics-plus's `PlaybarButton.js` appends a stylesheet hiding
+`.main-nowPlayingBar-lyricsButton` *before* calling
+`Spicetify.Playbar.Button().register()`. If that API doesn't match the running
+Spotify build, the hide lands and the replacement never appears.
+
+**Fix:** that extension is deliberately left at its upstream default (off).
+`src/lyric-gloss-playbar.js` hijacks the native button instead — a capture-phase
+click listener that routes to `/lyrics-plus` — so Spotify's own button, icon and
+position are kept and nothing is hidden. The worst case is the button carrying
+on doing what it always did.
+
+## Retired patch edits
+
+`patch.py remove` only reverses the edits currently in `EDITS`. An edit that was
+shipped and later dropped would otherwise be stranded in an already-patched tree
+forever, because `remove` no longer recognises it and `apply` sees the file as
+already patched. Anything retired must be moved to `RETIRED`, which is swept on
+both apply and remove.
