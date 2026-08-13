@@ -121,6 +121,13 @@ and because it returns early without scrolling when the active line is index 0
 and the first line starts within 300ms, which is exactly the state at the start
 of a track.
 
+It also only follows the active line while that line is already on screen, so
+scrubbing to a distant part of a song left the page where it was. The guard is
+worth keeping — it stops the page yanking you back when you scroll off to read
+ahead — so the two cases are distinguished by distance: playback advances the
+active line by exactly one, a seek moves it by more. Jumps scroll instantly
+rather than smoothly, since animating the length of a song looks broken.
+
 The page scrolls Spotify's shared main-view container, not anything lyrics-plus
 owns, so its scrollbar cannot be styled from the lyrics container. It is also not a native
 scrollbar: Spotify uses OverlayScrollbars, which renders real DOM elements

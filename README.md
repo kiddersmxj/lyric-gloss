@@ -18,7 +18,7 @@ beneath each line — it just has no general translation source. This adds one.
 | Re-apply after `spicetify upgrade` | `install.sh`, re-runnable, refuses on upstream drift |
 | Rate limiting | circuit breaker, 2m→2h backoff, persisted |
 | Playbar button | Spotify's own lyrics button opens this page |
-| Scroll | follows the active line, snaps to top on track change |
+| Scroll | follows the active line, snaps to top on track change, follows scrubs |
 | Scrollbar | hidden on the lyrics route only |
 | Translation quality | adequate for prose, literal on slang — see SPEC.md |
 

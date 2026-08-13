@@ -164,6 +164,34 @@ EDITS = [
         "\t// one ended.\n"
         "\tconst lyricsId = `${Spicetify.Player?.data?.item?.uri ?? \"\"}::${lyrics[0].text}`;",
     ),
+    # 3. Scrubbing. Upstream only follows the active line when it is already on
+    #    screen, so seeking somewhere far away leaves the page where it was. The
+    #    in-viewport guard is worth keeping for normal playback — it stops the
+    #    page yanking you back if you scroll off to read ahead — so distinguish
+    #    the two: a seek moves the active line by more than one, playback
+    #    advances it by exactly one.
+    (
+        "Pages.js",
+        "\tuseEffect(() => {\n"
+        "\t\tif (activeLineRef.current && (initialScroll.current || isInViewport(activeLineRef.current))) {",
+        "\tconst lastLineIndex = useRef(-1);\n"
+        "\n"
+        "\tuseEffect(() => {\n"
+        "\t\t// A scrub jumps the active line by more than one. Follow it even when\n"
+        "\t\t// the target is off-screen; single-line advances keep the upstream\n"
+        "\t\t// behaviour so manual scrolling during playback is not overridden.\n"
+        "\t\tconst jumped = lastLineIndex.current !== -1 && Math.abs(activeLineIndex - lastLineIndex.current) > 1;\n"
+        "\t\tlastLineIndex.current = activeLineIndex;\n"
+        "\n"
+        "\t\tif (activeLineRef.current && (initialScroll.current || jumped || isInViewport(activeLineRef.current))) {",
+    ),
+    # Jumps are instant rather than animated — smooth-scrolling the length of a
+    # song looks broken.
+    (
+        "Pages.js",
+        '\t\t\t\tbehavior: initialScroll.current ? "auto" : "smooth",',
+        '\t\t\t\tbehavior: initialScroll.current || jumped ? "auto" : "smooth",',
+    ),
     # 2. On a new track the active line is index 0, and upstream returns early
     #    without scrolling whenever the first line starts soon. That is exactly
     #    the case where the page most needs to snap back to the top.
