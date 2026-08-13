@@ -37,6 +37,48 @@ const ProviderAutoTranslate = (() => {
 	// Lines that carry no words — leave them exactly as they are.
 	const isUntranslatable = (text) => !text || !/\p{Letter}/u.test(text);
 
+	// --- rate-limit circuit breaker ----------------------------------------
+	// The endpoint is unofficial and throttles by IP. Once it starts returning
+	// 429 the only useful response is to stop asking for a while: every extra
+	// request keeps the limit alive. Backoff escalates while it keeps failing
+	// and resets after a clean run, and it is persisted so restarting Spotify
+	// doesn't immediately resume hammering.
+	const COOLDOWN_KEY = "lyrics-plus:auto-translate:cooldown";
+	const BACKOFF_MS = [2 * 60_000, 10 * 60_000, 30 * 60_000, 2 * 60 * 60_000];
+
+	function readCooldown() {
+		try {
+			return JSON.parse(localStorage.getItem(COOLDOWN_KEY)) ?? { until: 0, step: 0 };
+		} catch {
+			return { until: 0, step: 0 };
+		}
+	}
+
+	function startCooldown() {
+		const { step } = readCooldown();
+		const next = Math.min(step, BACKOFF_MS.length - 1);
+		const until = Date.now() + BACKOFF_MS[next];
+
+		try {
+			localStorage.setItem(COOLDOWN_KEY, JSON.stringify({ until, step: next + 1 }));
+		} catch {
+			/* cache full — the in-flight guard below still applies */
+		}
+
+		const minutes = Math.round(BACKOFF_MS[next] / 60_000);
+		console.warn(`[auto-translate] rate limited; pausing ${minutes}m`);
+		Spicetify.showNotification(`Lyrics translation rate limited — pausing for ${minutes} min`, true, 6000);
+	}
+
+	function clearCooldown() {
+		if (readCooldown().step === 0) return;
+		try {
+			localStorage.removeItem(COOLDOWN_KEY);
+		} catch {
+			/* nothing useful to do */
+		}
+	}
+
 	function buildURL(text, sourceLang, targetLang) {
 		const params = {
 			client: "gtx",
@@ -65,9 +107,15 @@ const ProviderAutoTranslate = (() => {
 
 	async function viaFetch(url) {
 		const response = await fetch(url);
-		if (!response.ok) throw new Error(`HTTP ${response.status}`);
+		if (!response.ok) {
+			const error = new Error(`HTTP ${response.status}`);
+			error.status = response.status;
+			throw error;
+		}
 		return response.json();
 	}
+
+	const isRateLimit = (error) => error?.status === 429 || /\b429\b|too many requests|rate.?limit/i.test(error?.message ?? "");
 
 	async function request(url) {
 		const candidates = transport
@@ -137,11 +185,21 @@ const ProviderAutoTranslate = (() => {
 
 		for (const chunk of chunkIndices(texts, translatable)) {
 			let block = null;
+			let requestFailed = false;
+
 			try {
 				block = await translateBlock(chunk.map((index) => texts[index]).join("\n"), sourceLang, targetLang);
 			} catch (error) {
+				requestFailed = true;
 				console.error("[auto-translate] chunk failed", error);
-				Spicetify.showNotification(`Translate failed: ${error?.message ?? error}`.slice(0, 300), true, 8000);
+
+				if (isRateLimit(error)) {
+					// Stop immediately. Continuing would issue one request per
+					// remaining chunk, each of which is also throttled, which is
+					// what kept the limit alive in the first place.
+					startCooldown();
+					return { lines: null, detected, rateLimited: true };
+				}
 			}
 
 			// The first chunk tells us what language the song is actually in.
@@ -164,8 +222,12 @@ const ProviderAutoTranslate = (() => {
 				continue;
 			}
 
-			// Segment count disagreed with input count — fall back to one
-			// request per line for this chunk so alignment can't drift.
+			// Only retry per line when the request SUCCEEDED but came back with
+			// the wrong number of segments. If the request itself failed, one
+			// retry per line means dozens of doomed calls for a single song —
+			// which is how a single 429 turned into sustained rate limiting.
+			if (requestFailed) continue;
+
 			console.warn(`[auto-translate] chunk misaligned (${lines?.length} vs ${chunk.length}), retrying per line`);
 			for (const index of chunk) {
 				try {
@@ -173,6 +235,10 @@ const ProviderAutoTranslate = (() => {
 					out[index] = single?.text == null ? null : single.text.trim();
 				} catch (error) {
 					console.error("[auto-translate] line failed", error);
+					if (isRateLimit(error)) {
+						startCooldown();
+						return { lines: null, detected, rateLimited: true };
+					}
 				}
 			}
 		}
@@ -220,19 +286,34 @@ const ProviderAutoTranslate = (() => {
 
 		let lines = cached?.lines?.length === texts.length ? cached.lines : null;
 
+		// Cached tracks still render while throttled; only new requests stop.
+		if (!lines) {
+			const { until } = readCooldown();
+			if (Date.now() < until) {
+				console.log(`[auto-translate] in cooldown for another ${Math.round((until - Date.now()) / 1000)}s`);
+				return null;
+			}
+		}
+
 		if (!lines) {
 			console.log(`[auto-translate] requesting ${texts.length} lines for ${uri} (${sourceLang ?? "auto"} → ${targetLang})`);
 			const result = await translateLines(texts, sourceLang, targetLang);
 
+			// Throttled: cache nothing, so this track retries once the cooldown
+			// expires rather than being remembered as untranslatable.
+			if (result.rateLimited) return null;
+
 			if (result.lines === null) {
 				// Already in the target language — remember so we don't ask again.
 				writeCache(uri, targetLang, { skip: result.detected ?? targetLang });
+				clearCooldown();
 				return null;
 			}
 
 			if (result.lines.every((line) => line === null)) return null;
 			lines = result.lines;
 			writeCache(uri, targetLang, { lines });
+			clearCooldown(); // a clean run resets the backoff ladder
 		}
 
 		return lyrics.map((line, index) => ({

@@ -218,3 +218,24 @@ guard in `hideNavEntry()` is gone as well: hiding now always wins.
 should be scoped to the container it belongs to. Per-session UI experiments
 mean a selector that works on one launch can silently match something else on
 the next.
+
+## Translation fails in a loop with HTTP 429
+
+**Symptom:** every track, in any language, shows a translation failure. The
+console is full of 429s.
+
+**Cause:** the endpoint is unofficial and throttles by IP, and the provider
+amplified a single 429 into sustained throttling. The per-line retry — meant
+for a chunk that returns the *wrong number of segments* — also fired when the
+request itself failed, so one 429 became one doomed request per line, dozens
+per song, repeated on every track change.
+
+**Fix:** per-line retry now happens only when the request succeeded and came
+back misaligned. A 429 aborts the whole song immediately and opens a circuit
+breaker: 2m, then 10m, 30m, 2h while it keeps failing, reset by any clean run.
+The cooldown is persisted, so restarting Spotify doesn't resume hammering, and
+already-cached tracks keep rendering throughout.
+
+**If you are throttled right now,** wait it out — nothing is broken. To clear
+the breaker manually, remove `lyrics-plus:auto-translate:cooldown` from
+localStorage.
