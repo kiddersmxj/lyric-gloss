@@ -51,11 +51,27 @@ trap restore_perms EXIT
 
 sudo chmod a+wr "$SPOTIFY_DIR"
 sudo chmod -R a+wr "$SPOTIFY_DIR/Apps"
+
+# Always start from a pristine bundle. `backup apply` refuses outright when a
+# backup exists and Apps/ is already patched — it will not back up a patched
+# client — which silently leaves the previous build in place. Restoring first
+# also handles the case where Spotify was upgraded since the last backup.
+"$SPICETIFY" restore >/dev/null 2>&1 || true
 "$SPICETIFY" backup apply
 
+echo "==> verifying"
+fail=0
+grep -rq ProviderAutoTranslate "$SPOTIFY_DIR/Apps/xpui/" || { echo "  MISSING: translation provider" >&2; fail=1; }
+grep -q "nth-of-type(2)" "$SPOTIFY_DIR/Apps/xpui/user.css" || { echo "  MISSING: gloss stylesheet" >&2; fail=1; }
+grep -rq 'playbar-button") !== "false"' "$SPOTIFY_DIR/Apps/xpui/" || { echo "  MISSING: playbar button default" >&2; fail=1; }
+if ((fail)); then
+	echo "  apply did not land — the client is unchanged. Nothing above is installed." >&2
+	exit 1
+fi
+echo "  provider, stylesheet and playbar button all present in the client"
+
 echo
-echo "Done. Restart Spotify, then in the Lyrics view:"
+echo "Done. Restart Spotify. The playbar lyrics button is now this app."
+echo "Then, on the translate icon inside the lyrics page:"
 echo "  Translation Provider → <language> (auto-translate)"
 echo "  Translation Display  → Below original"
-echo "  Alignment            → Left        (gear icon; defaults to Center)"
-echo "  Playbar button       → on          (replaces Spotify's own lyrics button)"
