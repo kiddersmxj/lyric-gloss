@@ -64,12 +64,40 @@ whatever `spotify_path` points at, which is `/opt`.
 
 Keep only one installed.
 
-## Testing playback
+## "Can't play current song" depends on how Spotify was launched
 
-Do not test playback behaviour against a Spotify launched from a sandboxed
-tool shell — it reproduces an end-of-track failure of its own and will send you
-chasing a bug that isn't there. Launch it the normal way (dmenu →
-`spotify.desktop` → `/usr/local/bin/spotify` → `/opt/spotify/spotify`).
+**Symptom:** track plays to the end, *"can't play current song"*, no
+auto-advance. Manual skip works. Quitting and relaunching from dmenu fixes it
+immediately.
+
+Observed twice, both times on a Spotify started by something other than the
+normal desktop launch, and cleared both times by relaunching from dmenu. The
+mechanism is not established — the renderer logs no JS error, exception or
+failed request while it happens, so the fault is below the UI layer. The
+environment inherited from the launching process is the obvious suspect
+(`XDG_RUNTIME_DIR`, the DBus session, PipeWire socket access), but this has not
+been pinned down.
+
+**Practical rule:** always launch Spotify the normal way — dmenu →
+`spotify.desktop` → `/usr/local/bin/spotify` → `/opt/spotify/spotify`. Never
+judge playback behaviour from an instance started by a script, a tool shell, or
+anything else non-interactive, and never conclude anything about a patch from
+such an instance.
+
+Related: `PULSE_LATENCY_MSEC=60`, the workaround for Spotify's SIGFPE when
+PipeWire reports zero latency during sink transitions, is exported from
+`.bashrc` and so only reaches Spotify when launched from an interactive shell.
+A dmenu launch bypasses it entirely. Moving it to `~/.xprofile` would make it
+apply to every launch, and is worth trying if this recurs.
+
+## Settings live in localStorage, not in the repo
+
+Clearing `lyrics-plus:*` keys — which `uninstall.sh` suggests, and which is
+also how you clear the translation cache — resets **all** lyrics-plus settings
+to defaults, including Translation Provider (`none`) and Translation Display
+(`replace`). The patch is still installed; nothing renders until both are set
+again. Symptom: everything verifies as present in the client, but no gloss
+appears.
 
 Related: `PULSE_LATENCY_MSEC=60`, the workaround for Spotify's SIGFPE when
 PipeWire reports zero latency during sink transitions, is exported from
