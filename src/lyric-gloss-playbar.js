@@ -106,6 +106,19 @@
 		hideNavEntry(); // safe now: there is a working way in
 	}
 
+	// Mark the document while the lyrics route is open, so the stylesheet can
+	// scope rules to it. The page scrolls Spotify's main view container, not
+	// anything lyrics-plus owns, so its scrollbar cannot be reached without
+	// this — and hiding it unscoped would strip scrollbars from every page.
+	const ROUTE_CLASS = "lyric-gloss-route";
+
+	function syncRouteClass(pathname) {
+		document.documentElement.classList.toggle(ROUTE_CLASS, pathname === ROUTE);
+	}
+
+	syncRouteClass(Spicetify.Platform.History.location?.pathname);
+	Spicetify.Platform.History.listen((location) => syncRouteClass(location?.pathname));
+
 	bind();
 
 	// Spotify replaces the playbar element (track changes, resize, PiP), which

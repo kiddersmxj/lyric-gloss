@@ -48,3 +48,23 @@
 .lyrics-lyricsContainer-LyricsContainer {
 	padding-top: 0;
 }
+
+/* The page auto-scrolls on every line, and each scroll flashes Spotify's
+ * overlay scrollbar in and out. Hide it — but only while the lyrics route is
+ * open, since the scroller is Spotify's shared main view container and other
+ * pages still want their scrollbar.
+ *
+ * The `lyric-gloss-route` class is toggled on <html> by lyric-gloss-playbar.js.
+ */
+html.lyric-gloss-route ::-webkit-scrollbar,
+html.lyric-gloss-route ::-webkit-scrollbar-thumb,
+html.lyric-gloss-route ::-webkit-scrollbar-track {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+html.lyric-gloss-route,
+html.lyric-gloss-route * {
+	scrollbar-width: none !important;
+}
