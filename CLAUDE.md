@@ -66,12 +66,17 @@ nav hiding. Critical path first; extras afterwards, guarded.
 
 ## Working on it
 
+- `./test` before anything ships. It covers the patch round-trip, atomicity,
+  the `RETIRED` sweep, and the provider's alignment, skip, cache and circuit
+  breaker — all offline, against a synthetic fixture and a fake endpoint. Add
+  a case for any behaviour you had to debug; that is what it is for.
 - `python3 patch.py apply|remove ~/.spicetify` — idempotent; refuses if any
   anchor isn't found exactly once, so upstream drift fails loudly.
-- Always test the round-trip from a clean baseline: remove → snapshot → apply →
-  remove → `diff -rq`. It must be byte-identical.
-- `node --check` every patched JS file. A syntax error takes out the whole app.
-- The provider is testable outside Spotify: shim `localStorage` and
+- The suite proves the machinery, not that the anchors still match the
+  *installed* lyrics-plus. Still do one real round-trip against your own tree
+  before shipping a patch change: remove → snapshot → apply → remove →
+  `diff -rq`. It must be byte-identical.
+- The provider is also testable interactively: shim `localStorage` and
   `Spicetify.CosmosAsync`, then `eval` the file. That is how the line-alignment
   and same-language-skip behaviour were verified against the live endpoint.
 
@@ -89,8 +94,19 @@ across four of the user's install-and-restart cycles before anyone looked at the
 actual DOM; the nav entry turned out to have no `href` and no `data-id`, so none
 of them could ever have matched. Measure first.
 
-Turn developer mode off afterwards — it is a pref edit, and `enable-devtools`
-has no off switch.
+Turning it off again is fiddlier than it looks, and getting it wrong wasted the
+user's time three times:
+
+- `spicetify config always_enable_devtools 0` only stops **spicetify**
+  re-enabling it on apply. It does not close an already-open channel.
+- The switch Spotify reads is `app.enable-developer-mode` in
+  `~/.config/spotify/prefs`, and it is read **at launch**. Edit it with Spotify
+  closed, or the file is rewritten from memory on exit and the edit is lost.
+- Spotify writes that key back to `true` after starting, so the file showing
+  `true` while the channel is closed is normal. Do not judge by the file.
+
+Verify with `curl -s http://127.0.0.1:8088/json/version` — a CDP-specific path.
+Checking whether *anything* answers on 8088 proves nothing.
 
 ## Rules that are not about code
 
