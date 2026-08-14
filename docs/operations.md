@@ -309,3 +309,22 @@ Pinning exclusively meant that once Cosmos had succeeded once, a later failure
 could never fall back to fetch. Cosmos also reports proxy failures as a body
 (`{"code":429,...}`) rather than throwing, so that shape is now detected and
 converted into a real error.
+
+## Snap to the top happens late — only once the first line is sung
+
+**Symptom:** a new track starts, the page stays where the previous song ended,
+and then jumps to the top the moment the first line is reached. Reads as
+intermittent, because how long you wait depends on the track's intro.
+
+**Cause:** the track-change effect fires the instant the lyrics change, before
+the new content has been laid out, so there is nothing to scroll and it does
+nothing. The jump you eventually see is the *follow* effect firing when the
+active line first advances.
+
+**Fix:** the scroll is deferred over a short `requestAnimationFrame` chain
+(12 frames, ~200ms) and walks up to the element that actually scrolls, setting
+`scrollTop = 0` directly. The frame handle is cancelled on cleanup so a track
+change cannot leave a loop running.
+
+**General shape:** scrolling a container immediately after the content driving
+its height changes is a no-op. Wait for layout.

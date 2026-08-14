@@ -219,13 +219,35 @@ EDITS = [
         "\tconst lastUserScroll = useRef(0);\n"
         "\n"
         "\t// New track: reset the follow state and put the page back at the top.\n"
-        "\t// pageRef is the page container, so scrolling it to `start` returns the\n"
-        "\t// shared main-view scroller to the beginning of the lyrics.\n"
+        "\t//\n"
+        "\t// Deferred across frames deliberately. At the moment the lyrics change\n"
+        "\t// the new content is not laid out yet, so scrolling immediately does\n"
+        "\t// nothing at all — the page then sits where the previous song ended\n"
+        "\t// until the first line is reached and the follow effect takes over,\n"
+        "\t// which reads as the jump arriving late rather than not happening.\n"
         "\tuseEffect(() => {\n"
         "\t\tlastLineIndex.current = -1;\n"
         "\t\tlastUserScroll.current = 0;\n"
         "\t\tinitialScroll.current = true;\n"
-        '\t\tpageRef.current?.scrollIntoView({ behavior: "auto", block: "start", inline: "nearest" });\n'
+        "\n"
+        "\t\tlet frame = 0;\n"
+        "\t\tlet handle = 0;\n"
+        "\n"
+        "\t\tconst toTop = () => {\n"
+        "\t\t\tconst el = pageRef.current;\n"
+        "\t\t\tif (el) {\n"
+        "\t\t\t\t// Walk up to whatever actually scrolls — it is Spotify's shared\n"
+        "\t\t\t\t// main-view container, not anything lyrics-plus owns.\n"
+        "\t\t\t\tlet node = el.parentElement;\n"
+        "\t\t\t\twhile (node && node.scrollHeight <= node.clientHeight) node = node.parentElement;\n"
+        "\t\t\t\tif (node) node.scrollTop = 0;\n"
+        '\t\t\t\telse el.scrollIntoView({ behavior: "auto", block: "start", inline: "nearest" });\n'
+        "\t\t\t}\n"
+        "\t\t\tif (++frame < 12) handle = requestAnimationFrame(toTop);\n"
+        "\t\t};\n"
+        "\n"
+        "\t\thandle = requestAnimationFrame(toTop);\n"
+        "\t\treturn () => cancelAnimationFrame(handle);\n"
         "\t}, [lyricsId]);\n",
     ),
     # Jumps are instant rather than animated — smooth-scrolling the length of a
@@ -275,6 +297,24 @@ EDITS = [
 # to reverse the current EDITS, so without this a shipped-then-retired edit
 # would be stranded in an already-patched tree forever. (patched, original)
 RETIRED = [
+    # First form of the deterministic snap-to-top: scrolled immediately on the
+    # lyrics change, before the new content was laid out, so it did nothing.
+    (
+        "Pages.js",
+        "\tconst lastLineIndex = useRef(-1);\n"
+        "\tconst lastUserScroll = useRef(0);\n"
+        "\n"
+        "\t// New track: reset the follow state and put the page back at the top.\n"
+        "\t// pageRef is the page container, so scrolling it to `start` returns the\n"
+        "\t// shared main-view scroller to the beginning of the lyrics.\n"
+        "\tuseEffect(() => {\n"
+        "\t\tlastLineIndex.current = -1;\n"
+        "\t\tlastUserScroll.current = 0;\n"
+        "\t\tinitialScroll.current = true;\n"
+        '\t\tpageRef.current?.scrollIntoView({ behavior: "auto", block: "start", inline: "nearest" });\n'
+        "\t}, [lyricsId]);\n",
+        "\tconst lastLineIndex = useRef(-1);\n\tconst lastUserScroll = useRef(0);\n",
+    ),
     # First form of the scrub fix: followed jumps, but kept upstream's
     # in-viewport guard for single-line advances, which meant that once the
     # active line drifted off-screen following stopped permanently.
