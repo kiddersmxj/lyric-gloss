@@ -1,0 +1,10 @@
+{
+	"name": "Lyrics Plus",
+	"icon": "<svg></svg>",
+	"subfiles": [
+		"Providers.js",
+		"ProviderLRCLIB.js",
+		"ProviderMusixmatch.js",
+		"ProviderNetease.js"
+	]
+}

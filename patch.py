@@ -235,17 +235,24 @@ EDITS = [
         "\t\tlet logged = false;\n"
         "\n"
         "\t\tconst toTop = () => {\n"
-        "\t\t\t// Walk up to whatever actually scrolls — Spotify's shared main-view\n"
-        "\t\t\t// container, managed by OverlayScrollbars, not anything we own.\n"
+        "\t\t\t// Walk up to whatever actually scrolls. Overflowing is NOT the same\n"
+        "\t\t\t// as scrollable: .lyrics-lyricsContainer-LyricsContainer overflows\n"
+        "\t\t\t// its parent but has overflow-y: visible, so setting scrollTop on\n"
+        "\t\t\t// it does nothing. The real scroller is an unnamed OverlayScrollbars\n"
+        "\t\t\t// viewport several levels up. Check the computed overflow.\n"
+        "\t\t\tconst scrollable = (el) => {\n"
+        "\t\t\t\tconst oy = getComputedStyle(el).overflowY;\n"
+        '\t\t\t\treturn (oy === "auto" || oy === "scroll") && el.scrollHeight > el.clientHeight;\n'
+        "\t\t\t};\n"
+        "\n"
         "\t\t\tlet node = pageRef.current?.parentElement;\n"
-        "\t\t\twhile (node && node.scrollHeight <= node.clientHeight) node = node.parentElement;\n"
+        "\t\t\twhile (node && !scrollable(node)) node = node.parentElement;\n"
         "\n"
         "\t\t\tif (node) {\n"
-        "\t\t\t\tif (!logged) {\n"
-        "\t\t\t\t\tlogged = true;\n"
-        '\t\t\t\t\tconsole.log("[lyric-gloss] scroller", node.className || node.tagName, `${node.scrollHeight}/${node.clientHeight} top=${node.scrollTop}`);\n'
-        "\t\t\t\t}\n"
         "\t\t\t\tnode.scrollTop = 0;\n"
+        "\t\t\t} else if (!logged) {\n"
+        "\t\t\t\tlogged = true;\n"
+        '\t\t\t\tconsole.warn("[lyric-gloss] no scrollable ancestor found for the lyrics page");\n'
         "\t\t\t}\n"
         "\n"
         "\t\t\t// Keep going until the new lyrics have actually laid out — height\n"
@@ -307,6 +314,15 @@ EDITS = [
 # to reverse the current EDITS, so without this a shipped-then-retired edit
 # would be stranded in an already-patched tree forever. (patched, original)
 RETIRED = [
+    # Third form of the snap-to-top: retried for 3s, but walked up looking for
+    # an ancestor whose content overflows. Overflowing is not the same as
+    # scrollable — it stopped on .lyrics-lyricsContainer-LyricsContainer,
+    # which has overflow-y: visible and ignores scrollTop entirely.
+    (
+        "Pages.js",
+        '\tconst lastLineIndex = useRef(-1);\n\tconst lastUserScroll = useRef(0);\n\n\t// New track: reset the follow state and put the page back at the top.\n\t//\n\t// Deferred across frames deliberately. At the moment the lyrics change\n\t// the new content is not laid out yet, so scrolling immediately does\n\t// nothing at all — the page then sits where the previous song ended\n\t// until the first line is reached and the follow effect takes over,\n\t// which reads as the jump arriving late rather than not happening.\n\tuseEffect(() => {\n\t\tlastLineIndex.current = -1;\n\t\tlastUserScroll.current = 0;\n\t\tinitialScroll.current = true;\n\n\t\tconst started = Date.now();\n\t\tlet handle = 0;\n\t\tlet logged = false;\n\n\t\tconst toTop = () => {\n\t\t\t// Walk up to whatever actually scrolls — Spotify\'s shared main-view\n\t\t\t// container, managed by OverlayScrollbars, not anything we own.\n\t\t\tlet node = pageRef.current?.parentElement;\n\t\t\twhile (node && node.scrollHeight <= node.clientHeight) node = node.parentElement;\n\n\t\t\tif (node) {\n\t\t\t\tif (!logged) {\n\t\t\t\t\tlogged = true;\n\t\t\t\t\tconsole.log("[lyric-gloss] scroller", node.className || node.tagName, `${node.scrollHeight}/${node.clientHeight} top=${node.scrollTop}`);\n\t\t\t\t}\n\t\t\t\tnode.scrollTop = 0;\n\t\t\t}\n\n\t\t\t// Keep going until the new lyrics have actually laid out — height\n\t\t\t// is zero for a while, and a short fixed budget expired before the\n\t\t\t// content existed. Stops early the moment the user scrolls.\n\t\t\tif (Date.now() - started < 3000 && lastUserScroll.current === 0) {\n\t\t\t\thandle = requestAnimationFrame(toTop);\n\t\t\t}\n\t\t};\n\n\t\thandle = requestAnimationFrame(toTop);\n\t\treturn () => cancelAnimationFrame(handle);\n\t}, [lyricsId]);\n',
+        '\tconst lastLineIndex = useRef(-1);\n\tconst lastUserScroll = useRef(0);\n',
+    ),
     # Second form of the snap-to-top: deferred, but only 12 frames (~200ms),
     # which expired before the new lyrics had laid out. Text taken verbatim
     # from a tree that had it installed, so the revert is exact.
@@ -392,6 +408,10 @@ RETIRED = [
 def undo_retired(app: Path) -> None:
     for name, patched, original in RETIRED:
         path = app / name
+        # A retired edit can name a file upstream has since dropped. Nothing to
+        # sweep there, and crashing would take both apply and remove with it.
+        if not path.is_file():
+            continue
         text = path.read_text()
         if patched in text:
             path.write_text(text.replace(patched, original))

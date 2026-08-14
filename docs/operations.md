@@ -328,3 +328,34 @@ change cannot leave a loop running.
 
 **General shape:** scrolling a container immediately after the content driving
 its height changes is a no-op. Wait for layout.
+
+## scrollTop does nothing — overflowing is not the same as scrollable
+
+**Symptom:** code sets `scrollTop = 0` on an ancestor of the lyrics page, the
+value does not stick, and the page only moves when some other effect scrolls it.
+
+**Cause:** finding the scroll container by `scrollHeight > clientHeight` alone.
+Measured on the live client, the ancestor chain from the lyrics page is:
+
+```
+1: .lyrics-lyricsContainer-LyricsContainer   3843/2049  overflow-y: visible
+4: DIV (no class)                            3843/2049  overflow-y: scroll
+```
+
+Level 1 overflows its parent but does not scroll, so the naive walk stops there
+and every write to `scrollTop` is discarded. The real scroller is an unnamed
+OverlayScrollbars viewport several levels further up.
+
+**Fix:** test the computed style as well:
+
+```js
+const scrollable = (el) => {
+    const oy = getComputedStyle(el).overflowY;
+    return (oy === "auto" || oy === "scroll") && el.scrollHeight > el.clientHeight;
+};
+```
+
+**How to check:** with developer mode on, walk the chain over CDP and print
+`scrollHeight/clientHeight` and computed `overflowY` for each ancestor. Three
+attempts were spent tuning timing before anyone measured which element was
+being written to.
