@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Run the whole suite. No network, no spicetify install, no Spotify.
+#
+#   ./test                  everything
+#   ./test patch            patch.py only
+#   ./test provider         the translation provider only
+#   ./test shell            shell script syntax only
+#
+# Anything not covered here needs the real client — see docs/development.md.
+set -uo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$HERE" || exit 1
+
+what=${1:-all}
+status=0
+
+run() {
+	echo
+	echo "==> $1"
+	shift
+	"$@" || status=1
+}
+
+if [[ $what == all || $what == patch ]]; then
+	run "patch.py" python3 -m pytest tests/test_patch.py -q
+fi
+
+if [[ $what == all || $what == provider ]]; then
+	run "ProviderAutoTranslate" node --test tests/provider.test.mjs
+fi
+
+if [[ $what == all || $what == shell ]]; then
+	run "shell scripts parse" bash -n install.sh uninstall.sh test
+	if command -v shellcheck >/dev/null; then
+		run "shellcheck" shellcheck install.sh uninstall.sh test
+	fi
+fi
+
+echo
+((status)) && echo "FAILED" || echo "OK"
+exit $status

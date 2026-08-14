@@ -201,11 +201,17 @@ def test_retired_edits_are_swept_on_apply_and_on_remove(spice, name, patched, or
     """
     app = spice / "CustomApps" / "lyrics-plus"
     pristine = snapshot(app)
-
-    # Simulate a tree still carrying the retired edit.
     target = app / name
+
+    # Reconstruct a tree that still carries the retired edit. Some retired
+    # edits anchored on text another edit introduced, so their region only
+    # exists in a patched tree — which is also the real situation, since the
+    # tree being swept is always one an older install.sh patched.
     if original not in target.read_text():
-        pytest.skip(f"fixture does not carry the region {name} retired edit applies to")
+        run("apply", spice)
+        if original not in target.read_text():
+            pytest.skip(f"the region this {name} edit applied to no longer exists in either state")
+
     target.write_text(target.read_text().replace(original, patched, 1))
 
     run("remove", spice)

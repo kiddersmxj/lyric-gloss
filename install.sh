@@ -89,6 +89,6 @@ echo "  provider, stylesheet and playbar extension all present in the client"
 
 echo
 echo "Done. Restart Spotify. The playbar lyrics button is now this app."
-echo "Then, on the translate icon inside the lyrics page:"
-echo "  Translation Provider → <language> (auto-translate)"
-echo "  Translation Display  → Below original"
+echo "There is nothing to configure — auto-translate to English, glossed below"
+echo "the original, is baked in. To change the target language, edit patch.py"
+echo "and re-run this script. See README.md."

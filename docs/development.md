@@ -10,6 +10,10 @@ docs/operations.md              failure modes, each with its symptom
 docs/development.md             this file
 patch.py                        text edits against vendored lyrics-plus
 install.sh, uninstall.sh        orchestration
+test                            test runner — patch, provider, shell
+tests/test_patch.py             patch round-trip, atomicity, retired sweep
+tests/provider.test.mjs         provider behaviour against a fake endpoint
+tests/fixtures/lyrics-plus/     synthetic stand-in for the upstream app
 src/ProviderAutoTranslate.js    translation source, copied into lyrics-plus
 src/lyric-gloss-playbar.js      spicetify extension: playbar button + nav hiding
 src/gloss.css                   spicetify theme: gloss styling + chrome removal
@@ -41,30 +45,34 @@ restores `root:root` 755/644 through an `EXIT` trap.
 
 ## Testing
 
-There is no test runner. Three checks, all cheap, all worth doing before
-shipping a patch change:
-
-**Round-trip must be byte-identical.** Removal is the safety net; if it drifts,
-`uninstall.sh` stops being trustworthy.
-
 ```sh
-cp -r ~/.spicetify/CustomApps /tmp/t/
-python3 patch.py remove /tmp/t          # clean baseline
-cp -r /tmp/t/CustomApps /tmp/t/baseline
-python3 patch.py apply  /tmp/t
-python3 patch.py remove /tmp/t
-diff -rq /tmp/t/baseline /tmp/t/CustomApps
+./test              # everything: patch round-trip, provider, shell syntax, shellcheck
+./test patch        # patch.py only          (pytest, tests/test_patch.py)
+./test provider     # the provider only      (node:test, tests/provider.test.mjs)
 ```
 
-**Syntax-check every patched file.** `node --check` on `index.js`,
-`OptionsMenu.js`, `ProviderAutoTranslate.js`, `lyric-gloss-playbar.js`. One
-syntax error takes out the entire lyrics app.
+Everything runs offline. The patch tests work against a synthetic `lyrics-plus`
+fixture rather than a real install, and the provider tests against a fake
+endpoint — so no spicetify, no Spotify and no network are required, which is
+also why CI can run them (`.github/workflows/ci.yml`, on push and PR).
 
-**Exercise the provider outside Spotify.** Shim `localStorage` and
-`Spicetify.CosmosAsync` with `fetch`, `eval` the source, and call
-`getTranslation()`. Worth covering: a non-English track, a track already in the
-target language (must skip and cache the skip), and a repeat call (must make
-zero requests).
+What the suite is actually protecting:
+
+- **The round-trip is byte-identical.** Removal is the safety net; if it drifts,
+  `uninstall.sh` stops being trustworthy and a half-reverted app is worse than a
+  patched one.
+- **`RETIRED` is enforced.** An edit that shipped and was later dropped must be
+  reversible, or already-patched installs can never be cleaned up. This has bitten
+  repeatedly — see the entries in `patch.py`.
+- **Anchors match exactly once, and a bad anchor writes nothing.** Upstream drift
+  must fail loudly and atomically rather than produce a half-patched app.
+- **The provider backs off rather than retrying harder.** Circuit breaker,
+  cooldown persistence, transport fallback, and the same-language skip — the
+  behaviours where getting it wrong caused sustained rate limiting.
+
+After changing a patch edit, also `node --check` the patched files against a real
+tree; one syntax error takes out the entire lyrics app, and the fixture cannot
+catch a mismatch with the *actual* upstream source.
 
 ## Conventions
 
