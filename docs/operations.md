@@ -67,28 +67,30 @@ Keep only one installed.
 ## "Can't play current song" depends on how Spotify was launched
 
 **Symptom:** track plays to the end, *"can't play current song"*, no
-auto-advance. Manual skip works. Quitting and relaunching from dmenu fixes it
-immediately.
+auto-advance. Manual skip works. Quitting and relaunching from your desktop
+launcher fixes it immediately.
 
 Observed twice, both times on a Spotify started by something other than the
-normal desktop launch, and cleared both times by relaunching from dmenu. The
+normal desktop launch, and cleared both times by relaunching normally. The
 mechanism is not established — the renderer logs no JS error, exception or
 failed request while it happens, so the fault is below the UI layer. The
 environment inherited from the launching process is the obvious suspect
 (`XDG_RUNTIME_DIR`, the DBus session, PipeWire socket access), but this has not
 been pinned down.
 
-**Practical rule:** always launch Spotify the normal way — dmenu →
-`spotify.desktop` → `/usr/local/bin/spotify` → `/opt/spotify/spotify`. Never
-judge playback behaviour from an instance started by a script, a tool shell, or
+**Practical rule:** always launch Spotify the normal way, through whatever
+starts `spotify.desktop` for you, rather than from a terminal. Never judge
+playback behaviour from an instance started by a script, a tool shell, or
 anything else non-interactive, and never conclude anything about a patch from
 such an instance.
 
-Related: `PULSE_LATENCY_MSEC=60`, the workaround for Spotify's SIGFPE when
-PipeWire reports zero latency during sink transitions, is exported from
-`.bashrc` and so only reaches Spotify when launched from an interactive shell.
-A dmenu launch bypasses it entirely. Moving it to `~/.xprofile` would make it
-apply to every launch, and is worth trying if this recurs.
+Related, and a general trap rather than a lyric-gloss one: environment
+workarounds exported from `.bashrc` only reach Spotify when it is launched from
+an interactive shell, so the two launch paths do not behave identically. The
+example here is `PULSE_LATENCY_MSEC=60`, the workaround for Spotify's SIGFPE
+when PipeWire reports zero latency during sink transitions. Anything like that
+belongs in `~/.xprofile` (or the `.desktop` entry) so it applies to every
+launch.
 
 ## Settings live in localStorage, not in the repo
 

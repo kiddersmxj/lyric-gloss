@@ -90,9 +90,9 @@ curl -s http://127.0.0.1:8088/json          # find the page target's ws:// URL
 ```
 
 Then drive it over CDP (`Runtime.evaluate`). Four selector guesses were shipped
-across four of the user's install-and-restart cycles before anyone looked at the
-actual DOM; the nav entry turned out to have no `href` and no `data-id`, so none
-of them could ever have matched. Measure first.
+across four install-and-restart cycles before anyone looked at the actual DOM;
+the nav entry turned out to have no `href` and no `data-id`, so none of them
+could ever have matched. Measure first.
 
 Turning it off again is fiddlier than it looks, and getting it wrong wasted the
 user's time three times:
@@ -111,10 +111,10 @@ Checking whether *anything* answers on 8088 proves nothing.
 ## Rules that are not about code
 
 **Never judge Spotify playback from an instance launched by a tool shell or
-script.** It reproduces an end-of-track failure of its own. Have the user launch
-it normally (dmenu) and report back. Concluding otherwise from a
-script-launched instance produced several rounds of wrong diagnosis and a
-needless full revert.
+script.** It reproduces an end-of-track failure of its own. Ask for it to be
+launched normally — through the desktop entry, not a terminal — and reported
+back on. Concluding otherwise from a script-launched instance produced several
+rounds of wrong diagnosis and a needless full revert.
 
 **localStorage flushes lazily.** Wait ~20s after writing before quitting
 Spotify, or the write is lost and looks like it never happened.

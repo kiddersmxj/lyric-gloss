@@ -8,6 +8,7 @@ README.md                       what it is, install, status
 SPEC.md                         design and the reasoning behind it
 docs/operations.md              failure modes, each with its symptom
 docs/development.md             this file
+docs/roadmap.md                 what is missing, prioritised
 patch.py                        text edits against vendored lyrics-plus
 install.sh, uninstall.sh        orchestration
 test                            test runner — patch, provider, shell
@@ -28,8 +29,10 @@ src/gloss.css                   spicetify theme: gloss styling + chrome removal
 | `src/gloss.css` | `~/.spicetify/Themes/lyric-gloss/user.css` |
 | all of the above, after apply | `/opt/spotify/Apps/xpui/` |
 
-`~/.spicetify` is a symlink into the `home-k` dotfiles repo, but `CustomApps/`
-and `Extensions/` are untracked there — this repo is the source of truth.
+Nothing installed is the source of truth — `CustomApps/` and `Extensions/` are
+overwritten by `spicetify upgrade` and by this repo's `install.sh`. Edit here,
+re-run `install.sh`. If `~/.spicetify` is a symlink into a dotfiles repo, keep
+those two directories untracked there for the same reason.
 
 ## Commands
 

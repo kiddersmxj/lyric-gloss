@@ -13,7 +13,40 @@ SPICE_HOME="${SPICETIFY_HOME:-$HOME/.spicetify}"
 SPOTIFY_DIR="${SPOTIFY_DIR:-/opt/spotify}"
 SPICETIFY="$SPICE_HOME/spicetify"
 
-[[ -x $SPICETIFY ]] || { echo "spicetify not found at $SPICETIFY" >&2; exit 1; }
+# Prerequisites are checked, never installed. spicetify rewrites a proprietary
+# client's JS bundle and its own installer wants to be run deliberately, so
+# pulling it in from inside this script would be doing something substantial on
+# someone's behalf while they were expecting a lyrics tweak.
+if [[ ! -d $SPOTIFY_DIR ]]; then
+	cat >&2 <<-EOF
+		Spotify not found at $SPOTIFY_DIR
+
+		This needs the desktop client installed there — on Arch that is the AUR
+		'spotify' package. If yours lives elsewhere, point SPOTIFY_DIR at it:
+
+		    SPOTIFY_DIR=/path/to/spotify ./install.sh
+
+		Note that spicetify patches whatever its own spotify_path points at, so
+		the two have to agree. Flatpak and Snap installs are untested.
+	EOF
+	exit 1
+fi
+
+if [[ ! -x $SPICETIFY ]]; then
+	cat >&2 <<-EOF
+		spicetify not found at $SPICETIFY
+
+		This is a patch against spicetify's bundled lyrics-plus app, so spicetify
+		has to be installed first. It is not installed for you. See:
+
+		    https://spicetify.app/docs/getting-started
+
+		If yours is installed elsewhere, point SPICETIFY_HOME at it:
+
+		    SPICETIFY_HOME=/path/to/.spicetify ./install.sh
+	EOF
+	exit 1
+fi
 
 # Spicetify must be new enough for the installed Spotify, or lyrics-plus throws
 # "Something went wrong" on the lyrics route and can take the client down with

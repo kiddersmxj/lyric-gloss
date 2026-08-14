@@ -55,6 +55,11 @@ Everything below is working and in daily use.
 | [spicetify](https://spicetify.app) | **2.44.0 or newer**, at `~/.spicetify` (override with `SPICETIFY_HOME`). `install.sh` upgrades it if it is older. |
 | Also | `python3`, `bash`, and `sudo` — see below for exactly what the sudo is for. |
 
+**Spotify and spicetify are not installed for you.** `install.sh` checks for
+both and stops with instructions if either is missing. It will, however,
+`spicetify upgrade` an existing spicetify that is older than 2.44.0 — an older
+one throws inside the lyrics route and can take the client down with it.
+
 ## Install
 
 ```sh
@@ -172,6 +177,7 @@ fake endpoint.
 
 - [docs/development.md](docs/development.md) — layout, commands, conventions
 - [docs/operations.md](docs/operations.md) — failure modes, each with its symptom
+- [docs/roadmap.md](docs/roadmap.md) — what is missing, prioritised
 - [SPEC.md](SPEC.md) — design, and why it is built this way
 - [CLAUDE.md](CLAUDE.md) — orientation for coding agents; the invariants not to break
 
