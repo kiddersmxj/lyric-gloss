@@ -230,20 +230,30 @@ EDITS = [
         "\t\tlastUserScroll.current = 0;\n"
         "\t\tinitialScroll.current = true;\n"
         "\n"
-        "\t\tlet frame = 0;\n"
+        "\t\tconst started = Date.now();\n"
         "\t\tlet handle = 0;\n"
+        "\t\tlet logged = false;\n"
         "\n"
         "\t\tconst toTop = () => {\n"
-        "\t\t\tconst el = pageRef.current;\n"
-        "\t\t\tif (el) {\n"
-        "\t\t\t\t// Walk up to whatever actually scrolls — it is Spotify's shared\n"
-        "\t\t\t\t// main-view container, not anything lyrics-plus owns.\n"
-        "\t\t\t\tlet node = el.parentElement;\n"
-        "\t\t\t\twhile (node && node.scrollHeight <= node.clientHeight) node = node.parentElement;\n"
-        "\t\t\t\tif (node) node.scrollTop = 0;\n"
-        '\t\t\t\telse el.scrollIntoView({ behavior: "auto", block: "start", inline: "nearest" });\n'
+        "\t\t\t// Walk up to whatever actually scrolls — Spotify's shared main-view\n"
+        "\t\t\t// container, managed by OverlayScrollbars, not anything we own.\n"
+        "\t\t\tlet node = pageRef.current?.parentElement;\n"
+        "\t\t\twhile (node && node.scrollHeight <= node.clientHeight) node = node.parentElement;\n"
+        "\n"
+        "\t\t\tif (node) {\n"
+        "\t\t\t\tif (!logged) {\n"
+        "\t\t\t\t\tlogged = true;\n"
+        '\t\t\t\t\tconsole.log("[lyric-gloss] scroller", node.className || node.tagName, `${node.scrollHeight}/${node.clientHeight} top=${node.scrollTop}`);\n'
+        "\t\t\t\t}\n"
+        "\t\t\t\tnode.scrollTop = 0;\n"
         "\t\t\t}\n"
-        "\t\t\tif (++frame < 12) handle = requestAnimationFrame(toTop);\n"
+        "\n"
+        "\t\t\t// Keep going until the new lyrics have actually laid out — height\n"
+        "\t\t\t// is zero for a while, and a short fixed budget expired before the\n"
+        "\t\t\t// content existed. Stops early the moment the user scrolls.\n"
+        "\t\t\tif (Date.now() - started < 3000 && lastUserScroll.current === 0) {\n"
+        "\t\t\t\thandle = requestAnimationFrame(toTop);\n"
+        "\t\t\t}\n"
         "\t\t};\n"
         "\n"
         "\t\thandle = requestAnimationFrame(toTop);\n"
@@ -297,6 +307,14 @@ EDITS = [
 # to reverse the current EDITS, so without this a shipped-then-retired edit
 # would be stranded in an already-patched tree forever. (patched, original)
 RETIRED = [
+    # Second form of the snap-to-top: deferred, but only 12 frames (~200ms),
+    # which expired before the new lyrics had laid out. Text taken verbatim
+    # from a tree that had it installed, so the revert is exact.
+    (
+        "Pages.js",
+        '\tconst lastLineIndex = useRef(-1);\n\tconst lastUserScroll = useRef(0);\n\n\t// New track: reset the follow state and put the page back at the top.\n\t//\n\t// Deferred across frames deliberately. At the moment the lyrics change\n\t// the new content is not laid out yet, so scrolling immediately does\n\t// nothing at all — the page then sits where the previous song ended\n\t// until the first line is reached and the follow effect takes over,\n\t// which reads as the jump arriving late rather than not happening.\n\tuseEffect(() => {\n\t\tlastLineIndex.current = -1;\n\t\tlastUserScroll.current = 0;\n\t\tinitialScroll.current = true;\n\n\t\tlet frame = 0;\n\t\tlet handle = 0;\n\n\t\tconst toTop = () => {\n\t\t\tconst el = pageRef.current;\n\t\t\tif (el) {\n\t\t\t\t// Walk up to whatever actually scrolls — it is Spotify\'s shared\n\t\t\t\t// main-view container, not anything lyrics-plus owns.\n\t\t\t\tlet node = el.parentElement;\n\t\t\t\twhile (node && node.scrollHeight <= node.clientHeight) node = node.parentElement;\n\t\t\t\tif (node) node.scrollTop = 0;\n\t\t\t\telse el.scrollIntoView({ behavior: "auto", block: "start", inline: "nearest" });\n\t\t\t}\n\t\t\tif (++frame < 12) handle = requestAnimationFrame(toTop);\n\t\t};\n\n\t\thandle = requestAnimationFrame(toTop);\n\t\treturn () => cancelAnimationFrame(handle);\n\t}, [lyricsId]);\n',
+        '\tconst lastLineIndex = useRef(-1);\n\tconst lastUserScroll = useRef(0);\n',
+    ),
     # First form of the deterministic snap-to-top: scrolled immediately on the
     # lyrics change, before the new content was laid out, so it did nothing.
     (
