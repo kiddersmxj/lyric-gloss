@@ -71,6 +71,11 @@ zero requests).
 - Patch edits are `(file, anchor, replacement)` triples applied as plain text.
   Anchors must match **exactly once** — `apply` aborts otherwise rather than
   corrupting the app.
+- Validation is **sequential and staged**: edits are applied to in-memory copies
+  in order, and written only once every one has succeeded. So an edit may
+  legitimately anchor on text an earlier edit introduced, and a failure part way
+  through leaves the app untouched instead of half patched. `remove` mirrors
+  this in reverse order.
 - `manifest.json` is edited textually, never via a JSON round-trip;
   `json.dumps` reformats the file and breaks byte-identical removal.
 - Anything ever shipped and then dropped moves to `RETIRED`, so already-patched

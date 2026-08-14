@@ -207,6 +207,27 @@ EDITS = [
         "\n"
         "\t\tif (activeLineRef.current && (initialScroll.current || jumped || userIdle || isInViewport(activeLineRef.current))) {",
     ),
+    # 4. Snap to the top on track change, deterministically. Chained onto the
+    #    refs added above. The conditional effect below decides whether to
+    #    scroll from activeLineIndex and viewport state, and across a track
+    #    boundary both have proved unreliable — the page kept ending up wherever
+    #    the previous song finished. This does not consult either.
+    (
+        "Pages.js",
+        "\tconst lastLineIndex = useRef(-1);\n\tconst lastUserScroll = useRef(0);\n",
+        "\tconst lastLineIndex = useRef(-1);\n"
+        "\tconst lastUserScroll = useRef(0);\n"
+        "\n"
+        "\t// New track: reset the follow state and put the page back at the top.\n"
+        "\t// pageRef is the page container, so scrolling it to `start` returns the\n"
+        "\t// shared main-view scroller to the beginning of the lyrics.\n"
+        "\tuseEffect(() => {\n"
+        "\t\tlastLineIndex.current = -1;\n"
+        "\t\tlastUserScroll.current = 0;\n"
+        "\t\tinitialScroll.current = true;\n"
+        '\t\tpageRef.current?.scrollIntoView({ behavior: "auto", block: "start", inline: "nearest" });\n'
+        "\t}, [lyricsId]);\n",
+    ),
     # Jumps are instant rather than animated — smooth-scrolling the length of a
     # song looks broken.
     (
@@ -337,18 +358,24 @@ def apply(app: Path) -> None:
         print("already patched — nothing to do")
         return
 
-    missing = [f"{name}: {anchor.splitlines()[0][:60]}…" for name, anchor, _ in EDITS if (app / name).read_text().count(anchor) != 1]
-    if missing:
-        print("upstream changed, patch NOT applied. Anchors not found exactly once:", file=sys.stderr)
-        for item in missing:
-            print(f"  {item}", file=sys.stderr)
-        sys.exit(1)
+    # Validate and build sequentially in memory, then write only if every edit
+    # succeeded. Sequential matters: an edit may legitimately anchor on text an
+    # earlier edit introduced. Deferring the writes keeps it atomic, so a failure
+    # half way through leaves the app untouched rather than half patched.
+    staged: dict[str, str] = {}
+
+    for name, anchor, replacement in EDITS:
+        text = staged.get(name) or (app / name).read_text()
+        if text.count(anchor) != 1:
+            print("upstream changed, patch NOT applied. Anchor not found exactly once:", file=sys.stderr)
+            print(f"  {name}: {anchor.splitlines()[0][:70]}…", file=sys.stderr)
+            sys.exit(1)
+        staged[name] = text.replace(anchor, replacement)
 
     shutil.copy(HERE / "src" / "ProviderAutoTranslate.js", app / "ProviderAutoTranslate.js")
 
-    for name, anchor, replacement in EDITS:
-        path = app / name
-        path.write_text(path.read_text().replace(anchor, replacement))
+    for name, text in staged.items():
+        (app / name).write_text(text)
 
     print("patched lyrics-plus")
 
@@ -360,9 +387,15 @@ def remove(app: Path) -> None:
         print("not patched — nothing to do")
         return
 
+    # Reverse order, for the same chaining reason as apply().
+    staged: dict[str, str] = {}
+
     for name, anchor, replacement in reversed(EDITS):
-        path = app / name
-        path.write_text(path.read_text().replace(replacement, anchor))
+        text = staged.get(name) or (app / name).read_text()
+        staged[name] = text.replace(replacement, anchor)
+
+    for name, text in staged.items():
+        (app / name).write_text(text)
 
     (app / "ProviderAutoTranslate.js").unlink(missing_ok=True)
 
