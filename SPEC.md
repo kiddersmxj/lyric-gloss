@@ -44,10 +44,15 @@ mismatch can never silently shift every subsequent translation up by one.
 Requests are chunked to stay under ~1400 characters of source, which keeps the
 GET inside URL length limits. A typical song is one request.
 
-Two transports are tried in order — `Spicetify.CosmosAsync` (Spotify's native
-stack, no page CORS) then plain `fetch` — because it isn't obvious in advance
-which the client permits, and Cosmos can balk at long URLs and encoded
-newlines. Whichever works first is reused.
+Requests go out via plain `fetch`, which matters more than it looks.
+`Spicetify.CosmosAsync` proxies external requests through spicetify's shared
+CORS proxy, which is rate-limited across every spicetify user — it returns 429
+while the endpoint answers 200 from the same machine, and no amount of good
+behaviour on our side fixes that. The endpoint sends
+`access-control-allow-origin: *`, so `fetch` reaches it directly and is subject
+only to our own usage. Cosmos is kept as a fallback for builds that block
+direct fetch, and the chosen transport is tried first rather than exclusively,
+so a later failure can still fall back.
 
 ## Same-language detection
 

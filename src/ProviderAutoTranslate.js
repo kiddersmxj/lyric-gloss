@@ -92,17 +92,31 @@ const ProviderAutoTranslate = (() => {
 			.join("&")}`;
 	}
 
-	// Two transports, because it is not obvious in advance which the client
-	// permits: CosmosAsync (Spotify's native stack, no page CORS, but may balk
-	// at long URLs or encoded newlines) and plain fetch (subject to the page
-	// CSP). Whichever works first wins and is reused.
+	// Transport order matters, and fetch must come first.
+	//
+	// Spicetify's CosmosAsync routes external requests through its own shared
+	// CORS proxy (cors-proxy.spicetify.app), which is rate-limited across every
+	// spicetify user — so it returns 429 while the endpoint answers 200 from
+	// the same machine. The endpoint sends `access-control-allow-origin: *`, so
+	// a plain fetch reaches it directly and is subject only to our own usage.
+	//
+	// Cosmos is kept as a fallback in case a build blocks direct fetch.
 	let transport = null;
 
 	async function viaCosmos(url) {
 		const response = await Spicetify.CosmosAsync.get(url);
 		// Cosmos may hand back a parsed array or a raw string depending on the
 		// content-type it sees.
-		return typeof response === "string" ? JSON.parse(response) : response;
+		const parsed = typeof response === "string" ? JSON.parse(response) : response;
+
+		// Cosmos reports proxy failures as a body rather than by throwing.
+		if (parsed && !Array.isArray(parsed) && typeof parsed.code === "number" && parsed.code >= 400) {
+			const error = new Error(`HTTP ${parsed.code}`);
+			error.status = parsed.code;
+			throw error;
+		}
+
+		return parsed;
 	}
 
 	async function viaFetch(url) {
@@ -118,12 +132,15 @@ const ProviderAutoTranslate = (() => {
 	const isRateLimit = (error) => error?.status === 429 || /\b429\b|too many requests|rate.?limit/i.test(error?.message ?? "");
 
 	async function request(url) {
-		const candidates = transport
-			? [transport]
-			: [
-					{ name: "cosmos", fn: viaCosmos },
-					{ name: "fetch", fn: viaFetch },
-				];
+		const all = [
+			{ name: "fetch", fn: viaFetch },
+			{ name: "cosmos", fn: viaCosmos },
+		];
+
+		// A pinned transport is tried first, not exclusively. Pinning
+		// exclusively meant that once one was chosen a later failure could
+		// never fall back to the other.
+		const candidates = transport ? [transport, ...all.filter((c) => c.name !== transport.name)] : all;
 
 		const errors = [];
 		for (const candidate of candidates) {

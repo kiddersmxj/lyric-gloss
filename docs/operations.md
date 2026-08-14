@@ -278,3 +278,34 @@ the original guard was for.
 **Shape of the bug worth remembering:** a condition that can only be satisfied
 by a state the failure itself prevents. If following depends on being in the
 viewport, losing the viewport must have a way back.
+
+## 429 even though the endpoint works fine from the same machine
+
+**Symptom:** translation fails with 429 inside Spotify, while `curl` to the
+same endpoint from the same machine returns 200. The failing request in the
+console is not the endpoint but a proxied URL:
+
+```
+GET https://cors-proxy.spicetify.app/https://translate.googleapis.com/... 429
+```
+
+**Cause:** `Spicetify.CosmosAsync` routes external requests through spicetify's
+own shared CORS proxy. That proxy is rate-limited across every spicetify user,
+so its 429 has nothing to do with your usage and cannot be waited out by being
+well behaved.
+
+**Fix:** the endpoint sends `access-control-allow-origin: *`, so a plain
+`fetch` from the renderer reaches it directly. `fetch` is now the first
+transport, with Cosmos kept only as a fallback. Check with:
+
+```sh
+curl -sD- -o/dev/null -H 'Origin: https://xpui.app.spotify.com' \
+  'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=test' \
+  | grep -i access-control-allow-origin
+```
+
+**Related:** a pinned transport is now tried first rather than exclusively.
+Pinning exclusively meant that once Cosmos had succeeded once, a later failure
+could never fall back to fetch. Cosmos also reports proxy failures as a body
+(`{"code":429,...}`) rather than throwing, so that shape is now detected and
+converted into a real error.
