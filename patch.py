@@ -175,6 +175,22 @@ EDITS = [
         "\tuseEffect(() => {\n"
         "\t\tif (activeLineRef.current && (initialScroll.current || isInViewport(activeLineRef.current))) {",
         "\tconst lastLineIndex = useRef(-1);\n"
+        "\tconst lastUserScroll = useRef(0);\n"
+        "\n"
+        "\t// Note manual scrolling so auto-follow can stand aside for a moment.\n"
+        "\t// `wheel`/`touchmove` rather than `scroll`: scrollIntoView() below\n"
+        "\t// fires `scroll`, which would suspend the behaviour it implements.\n"
+        "\tuseEffect(() => {\n"
+        "\t\tconst note = () => {\n"
+        "\t\t\tlastUserScroll.current = Date.now();\n"
+        "\t\t};\n"
+        '\t\twindow.addEventListener("wheel", note, { passive: true });\n'
+        '\t\twindow.addEventListener("touchmove", note, { passive: true });\n'
+        "\t\treturn () => {\n"
+        '\t\t\twindow.removeEventListener("wheel", note);\n'
+        '\t\t\twindow.removeEventListener("touchmove", note);\n'
+        "\t\t};\n"
+        "\t}, []);\n"
         "\n"
         "\tuseEffect(() => {\n"
         "\t\t// A scrub jumps the active line by more than one. Follow it even when\n"
@@ -183,7 +199,13 @@ EDITS = [
         "\t\tconst jumped = lastLineIndex.current !== -1 && Math.abs(activeLineIndex - lastLineIndex.current) > 1;\n"
         "\t\tlastLineIndex.current = activeLineIndex;\n"
         "\n"
-        "\t\tif (activeLineRef.current && (initialScroll.current || jumped || isInViewport(activeLineRef.current))) {",
+        "\t\t// Self-healing. Upstream's in-viewport guard is a one-way door: once\n"
+        "\t\t// the active line drifts off-screen, every later advance is a single\n"
+        "\t\t// line, so the guard never passes again and following stops for good.\n"
+        "\t\t// Resume unless the user actually scrolled in the last few seconds.\n"
+        "\t\tconst userIdle = Date.now() - lastUserScroll.current > 4000;\n"
+        "\n"
+        "\t\tif (activeLineRef.current && (initialScroll.current || jumped || userIdle || isInViewport(activeLineRef.current))) {",
     ),
     # Jumps are instant rather than animated — smooth-scrolling the length of a
     # song looks broken.
@@ -232,6 +254,24 @@ EDITS = [
 # to reverse the current EDITS, so without this a shipped-then-retired edit
 # would be stranded in an already-patched tree forever. (patched, original)
 RETIRED = [
+    # First form of the scrub fix: followed jumps, but kept upstream's
+    # in-viewport guard for single-line advances, which meant that once the
+    # active line drifted off-screen following stopped permanently.
+    (
+        "Pages.js",
+        "\tconst lastLineIndex = useRef(-1);\n"
+        "\n"
+        "\tuseEffect(() => {\n"
+        "\t\t// A scrub jumps the active line by more than one. Follow it even when\n"
+        "\t\t// the target is off-screen; single-line advances keep the upstream\n"
+        "\t\t// behaviour so manual scrolling during playback is not overridden.\n"
+        "\t\tconst jumped = lastLineIndex.current !== -1 && Math.abs(activeLineIndex - lastLineIndex.current) > 1;\n"
+        "\t\tlastLineIndex.current = activeLineIndex;\n"
+        "\n"
+        "\t\tif (activeLineRef.current && (initialScroll.current || jumped || isInViewport(activeLineRef.current))) {",
+        "\tuseEffect(() => {\n"
+        "\t\tif (activeLineRef.current && (initialScroll.current || isInViewport(activeLineRef.current))) {",
+    ),
     (
         "index.js",
         '\t\t"translate:translated-lyrics-source": localStorage.getItem("lyrics-plus:visual:translate:translated-lyrics-source") || "autoTranslation:en",',

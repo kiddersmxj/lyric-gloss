@@ -258,3 +258,23 @@ set of real DOM elements (`.os-scrollbar`, `.os-scrollbar-handle`,
 `::-webkit-scrollbar` and its thumb. Never touch its size. If the lyrics ever
 stop scrolling again, look at `gloss.css` first: scrolling matters more than
 the scrollbar being invisible, so delete those rules rather than tolerate it.
+
+## Following stops mid-session and never resumes
+
+**Symptom:** the page follows the active line for a while — often half an hour
+and many tracks — then stops, and stays stopped even across songs.
+
+**Cause:** upstream only scrolls when the active line is already in the
+viewport. That is a one-way door. Once the line drifts off-screen for any
+reason — a window resize, an interrupted smooth scroll, one stray wheel nudge —
+every later advance moves it by a single line, so the jump test fails and the
+viewport test fails, and the condition can never become true again.
+
+**Fix:** the guard is now self-healing. Following resumes whenever the user has
+not scrolled for four seconds, so any drift recovers on its own. Manual
+scrolling is still respected while you are actually scrolling, which is what
+the original guard was for.
+
+**Shape of the bug worth remembering:** a condition that can only be satisfied
+by a state the failure itself prevents. If following depends on being in the
+viewport, losing the viewport must have a way back.

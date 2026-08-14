@@ -128,6 +128,13 @@ ahead — so the two cases are distinguished by distance: playback advances the
 active line by exactly one, a seek moves it by more. Jumps scroll instantly
 rather than smoothly, since animating the length of a song looks broken.
 
+The guard also has to be self-healing. Requiring the active line to be visible
+is a one-way door: once it drifts off-screen, every subsequent advance is a
+single line and neither test can pass again, so following stops permanently.
+Auto-follow therefore resumes after four seconds without any manual scrolling,
+which keeps the original intent — don't fight the user while they are
+scrolling — without the trap.
+
 The page scrolls Spotify's shared main-view container, not anything lyrics-plus
 owns, so its scrollbar cannot be styled from the lyrics container. It is also not a native
 scrollbar: Spotify uses OverlayScrollbars, which renders real DOM elements
