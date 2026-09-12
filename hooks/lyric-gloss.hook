@@ -1,0 +1,18 @@
+# Re-apply lyric-gloss whenever the spotify package is installed or upgraded.
+#
+# A Spotify update puts the stock app archives back, and Spotify loads those
+# in preference to the patched bundle — so without this, every update silently
+# turns the gloss off. Installed by install-hook.sh; see docs/operations.md.
+
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = spotify
+
+[Action]
+Description = Re-applying lyric-gloss to the updated Spotify...
+When = PostTransaction
+Exec = /usr/local/lib/lyric-gloss/reapply
+Depends = util-linux
+Depends = curl

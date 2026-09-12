@@ -43,7 +43,7 @@ Everything below is working and in daily use.
 | Rate limiting | circuit breaker, 2m → 2h backoff, persisted across restarts |
 | Playbar button | Spotify's own lyrics button opens this page |
 | Scroll | follows the active line, snaps to top on track change, follows scrubs |
-| Re-apply after upgrades | `install.sh` is re-runnable, and refuses on upstream drift |
+| Re-apply after upgrades | automatic on Arch via a pacman hook; `install.sh` is re-runnable and refuses on upstream drift |
 | Translation quality | adequate for prose, literal on slang — see [Limits](#limits) |
 
 ## Requirements
@@ -52,12 +52,12 @@ Everything below is working and in daily use.
 |---|---|
 | OS | Linux. Tested on Arch with the native `spotify` package. |
 | Spotify | The desktop client, installed at `/opt/spotify` (override with `SPOTIFY_DIR`). Flatpak and Snap are untested. |
-| [spicetify](https://spicetify.app) | **2.44.0 or newer**, at `~/.spicetify` (override with `SPICETIFY_HOME`). `install.sh` upgrades it if it is older. |
+| [spicetify](https://spicetify.app) | **2.45.0 or newer**, at `~/.spicetify` (override with `SPICETIFY_HOME`). `install.sh` upgrades it if it is older. |
 | Also | `python3`, `bash`, and `sudo` — see below for exactly what the sudo is for. |
 
 **Spotify and spicetify are not installed for you.** `install.sh` checks for
 both and stops with instructions if either is missing. It will, however,
-`spicetify upgrade` an existing spicetify that is older than 2.44.0 — an older
+`spicetify upgrade` an existing spicetify that is older than 2.45.0 — an older
 one throws inside the lyrics route and can take the client down with it.
 
 ## Install
@@ -103,9 +103,25 @@ the two `localStorage` keys that a restore cannot reach, and how to clear them.
 
 ## After an upgrade
 
-Re-run `./install.sh` after **any** `spicetify upgrade` or Spotify package
-upgrade — both replace the files this patches, silently. Re-running is safe: it
-unpatches first, so changes to the patch set are picked up rather than skipped.
+Every Spotify update silently turns the gloss off: the package puts the stock
+app files back, and Spotify loads those instead of the patch.
+
+**On Arch, install the pacman hook once and forget about it:**
+
+```sh
+./install-hook.sh
+```
+
+From then on, every upgrade of the `spotify` package — including AUR helper
+updates, which still go through pacman — re-applies lyric-gloss automatically,
+upgrading spicetify first if a newer release exists. Nothing prompts during the
+upgrade. Afterwards, quit Spotify and start it from your launcher. The hook runs
+the installer from wherever this repository was when you installed it, so re-run
+`./install-hook.sh` if you move it.
+
+**Otherwise,** re-run `./install.sh` after any Spotify package upgrade or
+`spicetify upgrade`. Re-running is always safe: it unpatches first, so changes
+to the patch set are picked up rather than skipped.
 
 If `lyrics-plus` has changed upstream in a way that moves the code this patches,
 `install.sh` refuses and tells you which anchor moved, rather than producing a

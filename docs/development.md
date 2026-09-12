@@ -11,6 +11,8 @@ docs/development.md             this file
 docs/roadmap.md                 what is missing, prioritised
 patch.py                        text edits against vendored lyrics-plus
 install.sh, uninstall.sh        orchestration
+install-hook.sh                 installs the pacman hook (Arch)
+hooks/                          the hook trigger and its root-side action
 test                            test runner — patch, provider, shell
 tests/test_patch.py             patch round-trip, atomicity, retired sweep
 tests/provider.test.mjs         provider behaviour against a fake endpoint

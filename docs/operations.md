@@ -81,6 +81,35 @@ strings -n 8 /opt/spotify/spotify | grep -m1 -oE '^[0-9.]+\.g[0-9a-f]+$'
 sed -n '/\[Backup\]/,$p' ~/.config/spicetify/config-xpui.ini
 ```
 
+### The pacman hook
+
+`install-hook.sh` installs two root-owned files: the trigger at
+`/etc/pacman.d/hooks/lyric-gloss.hook`, and the action at
+`/usr/local/lib/lyric-gloss/reapply` with the user and repository path baked in.
+On install or upgrade of the `spotify` package it:
+
+1. upgrades spicetify as the user if a newer release exists, and says so if the
+   upgrade did not take (GitHub rate-limits downloads by address);
+2. opens `/opt/spotify` as root — the only reason it runs as root;
+3. runs this repository's `install.sh` as the user with `LYRIC_GLOSS_HOOK=1`,
+   which skips sudo;
+4. restores `root:root` 755/644 on exit.
+
+Root never executes a file the user can edit: the action is a root-owned copy,
+and the installer it calls runs as the user. It never fails the package
+transaction — a failure prints a `:: lyric-gloss:` line and is swallowed.
+
+**Symptom it prints on failure:** `re-apply FAILED — lyric translations are off`.
+Full output from every run is appended to `/var/log/lyric-gloss.log`.
+
+**To exercise it without waiting for an update:** `sudo pacman -S spotify`
+reinstalls the current version, which fires the hook.
+
+**It assumes** spicetify at `~/.spicetify` and the repository still at the path
+it was installed from. Moving the repository makes the hook skip with a message;
+re-run `install-hook.sh`. `uninstall.sh` removes the hook first, so an uninstall
+cannot be undone by the next Spotify update.
+
 ## Two Spotify packages
 
 Arch has both `spotify` (AUR, real `/opt/spotify`) and `spotify-launcher`

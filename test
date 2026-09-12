@@ -31,9 +31,12 @@ if [[ $what == all || $what == provider ]]; then
 fi
 
 if [[ $what == all || $what == shell ]]; then
-	run "shell scripts parse" bash -n install.sh uninstall.sh test
+	scripts=(install.sh uninstall.sh install-hook.sh hooks/reapply test)
+	for script in "${scripts[@]}"; do
+		run "parses: $script" bash -n "$script"
+	done
 	if command -v shellcheck >/dev/null; then
-		run "shellcheck" shellcheck install.sh uninstall.sh test
+		run "shellcheck" shellcheck "${scripts[@]}"
 	fi
 fi
 

@@ -16,6 +16,7 @@ src/ProviderAutoTranslate.js    new file copied into that app — the translatio
 src/lyric-gloss-playbar.js      standalone spicetify extension — playbar button + nav hiding
 src/gloss.css                   installed as a spicetify theme — styling + chrome removal
 install.sh / uninstall.sh       orchestration, including the sudo window for /opt
+install-hook.sh, hooks/         pacman hook: re-apply after every Spotify update
 ```
 
 Nothing here runs standalone. Everything ends up inside `/opt/spotify/Apps/xpui/`
@@ -60,6 +61,13 @@ on the next. This is what made the nav mic bind itself as the playbar button.
 anything that throws stops everything after it. The route-class block was
 briefly placed before `bind()` and silently disabled the button binding and the
 nav hiding. Critical path first; extras afterwards, guarded.
+
+**Root never runs anything the user can edit.** The pacman hook's action is a
+root-owned copy; it opens `/opt` and hands everything else to `install.sh` as
+the user via `runuser`. Keep it that way — calling a script in the repository
+directly as root would make any write to the user's home a root escalation.
+
+**The hook must never fail the package transaction.** Report, log, swallow.
 
 **`/opt/spotify` is opened only for the apply.** `install.sh` restores
 `root:root` 755/644 via an `EXIT` trap. Never leave it world-writable.

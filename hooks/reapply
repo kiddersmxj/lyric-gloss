@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# pacman hook action: re-apply lyric-gloss after the spotify package changes.
+#
+# install-hook.sh installs a root-owned copy of this with the user and repository
+# filled in. It runs as root inside the package transaction, which is the only
+# reason it can open /opt/spotify without asking for a password. Everything else
+# — spicetify, the patch, the installer — runs as the user, because it all lives
+# in their home directory. Root never executes anything the user can edit.
+#
+# It must never fail the transaction. A Spotify update that installs cleanly is
+# worth more than the gloss, so every failure is reported and then swallowed.
+set -uo pipefail
+
+TARGET_USER='@USER@'
+REPO='@REPO@'
+SPOTIFY_DIR=/opt/spotify
+LOG=/var/log/lyric-gloss.log
+
+say() {
+	echo ":: lyric-gloss: $*"
+}
+
+# shellcheck disable=SC2329  # invoked from the EXIT trap in main
+restore_perms() {
+	chown -R root:root "$SPOTIFY_DIR" 2>/dev/null || true
+	find "$SPOTIFY_DIR/Apps" -type d -exec chmod 755 {} + 2>/dev/null || true
+	find "$SPOTIFY_DIR/Apps" -type f -exec chmod 644 {} + 2>/dev/null || true
+	chmod 755 "$SPOTIFY_DIR" 2>/dev/null || true
+}
+
+main() {
+	echo "---- $(date -Is)"
+
+	if ! home=$(getent passwd "$TARGET_USER" | cut -d: -f6) || [[ -z $home ]]; then
+		say "user $TARGET_USER not found — skipping"
+		return
+	fi
+	if [[ ! -x $REPO/install.sh ]]; then
+		say "installer not found at $REPO — skipping. Re-run install-hook.sh from wherever the repository lives now."
+		return
+	fi
+
+	# A clean environment, as the user. spicetify derives its config and state
+	# locations from HOME, and nothing from root's environment should leak in.
+	as_user() {
+		runuser -u "$TARGET_USER" -- env -i \
+			HOME="$home" USER="$TARGET_USER" LOGNAME="$TARGET_USER" \
+			PATH=/usr/local/bin:/usr/bin:/bin \
+			"$@"
+	}
+
+	# Spotify updates regularly outpace spicetify, and an older spicetify makes
+	# the lyrics page throw. Upgrade whenever a newer release exists — checked
+	# via the release redirect rather than the API, which is rate limited. /opt
+	# is still closed at this point, so upgrade's own attempt to re-apply fails
+	# harmlessly; the installer below does the real work.
+	local spicetify="$home/.spicetify/spicetify" have latest
+	if [[ -x $spicetify ]]; then
+		have=$(as_user "$spicetify" -v 2>/dev/null | tr -d '[:space:]')
+		latest=$(curl -fsSI -m 15 https://github.com/spicetify/cli/releases/latest 2>/dev/null |
+			awk 'tolower($1) == "location:" { gsub(/\r/, ""); n = split($2, a, "/"); sub(/^v/, "", a[n]); print a[n] }')
+		if [[ -n $have && -n $latest && $(printf '%s\n%s\n' "$have" "$latest" | sort -V | tail -1) != "$have" ]]; then
+			say "upgrading spicetify $have → $latest"
+			as_user "$spicetify" -n upgrade >/dev/null 2>&1 || true
+
+			# Upgrade's exit status is useless here — its re-apply step always
+			# fails with /opt closed — and the download itself can fail quietly
+			# (GitHub rate-limits by address). Check the version actually moved.
+			local now
+			now=$(as_user "$spicetify" -v 2>/dev/null | tr -d '[:space:]')
+			if [[ $now != "$latest" ]]; then
+				say "spicetify upgrade did not take (still ${now:-unknown}); carrying on with it."
+				say "if the lyrics page shows an error, run: $spicetify upgrade && $REPO/install.sh"
+			fi
+		fi
+	fi
+
+	# main runs in a pipeline, i.e. a subshell, so EXIT fires when it finishes —
+	# including on a signal — and /opt is never left world-writable.
+	trap restore_perms EXIT
+	chmod a+wr "$SPOTIFY_DIR"
+	chmod -R a+wr "$SPOTIFY_DIR/Apps"
+
+	if as_user env LYRIC_GLOSS_HOOK=1 bash "$REPO/install.sh"; then
+		say "re-applied. Quit Spotify and start it again from your launcher."
+	else
+		say "re-apply FAILED — lyric translations are off until this is fixed."
+		say "details: $LOG — then run $REPO/install.sh by hand."
+	fi
+}
+
+main 2>&1 | tee -a "$LOG" | grep '^:: lyric-gloss:'
+exit 0

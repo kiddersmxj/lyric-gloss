@@ -7,6 +7,14 @@ SPICE_HOME="${SPICETIFY_HOME:-$HOME/.spicetify}"
 SPOTIFY_DIR="${SPOTIFY_DIR:-/opt/spotify}"
 SPICETIFY="$SPICE_HOME/spicetify"
 
+# The pacman hook goes first: left behind, it would re-apply the patch on the
+# next Spotify update and quietly undo this uninstall.
+if [[ -e /etc/pacman.d/hooks/lyric-gloss.hook || -e /usr/local/lib/lyric-gloss/reapply ]]; then
+	echo "==> removing pacman hook"
+	sudo rm -f /etc/pacman.d/hooks/lyric-gloss.hook
+	sudo rm -rf /usr/local/lib/lyric-gloss
+fi
+
 echo "==> restoring stock Spotify bundle"
 restore_perms() {
 	sudo chown -R root:root "$SPOTIFY_DIR" 2>/dev/null || true
