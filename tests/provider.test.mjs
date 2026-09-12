@@ -284,7 +284,9 @@ test("a 429 opens the circuit breaker, and nothing new is requested while it hol
 	const { provider, storage, notifications, clock } = load({ fetchImpl: fetchFrom(endpoint) });
 
 	assert.equal(await provider.getTranslation(lyricsOf("uno"), "spotify:track:l", null, "en"), null);
-	assert.equal(endpoint.calls.length, 1);
+	// One attempt per client identifier: a 429 rotates to the next client, and
+	// the breaker opens only once every client is throttled.
+	assert.equal(endpoint.calls.length, 2);
 	assert.match(notifications[0], /rate limited/i);
 
 	const cooldown = JSON.parse(storage.getItem(COOLDOWN_KEY));
@@ -292,7 +294,49 @@ test("a 429 opens the circuit breaker, and nothing new is requested while it hol
 
 	// A different track during the cooldown must not ask at all.
 	assert.equal(await provider.getTranslation(lyricsOf("dos"), "spotify:track:m", null, "en"), null);
-	assert.equal(endpoint.calls.length, 1, "asked again while throttled");
+	assert.equal(endpoint.calls.length, 2, "asked again while throttled");
+});
+
+test("a throttled client rotates to the next one without opening the breaker", async () => {
+	// Seen for real: `gtx` returned Google's "Sorry…" page for the address while
+	// `dict-chrome-ex` answered normally with the same response shape.
+	const endpoint = fakeEndpoint();
+	const clients = [];
+	const { provider, storage, notifications } = load({
+		fetchImpl: async (url) => {
+			const client = new URL(url).searchParams.get("client");
+			clients.push(client);
+			if (client === "gtx") return { ok: false, status: 429, json: async () => ({}) };
+			return { ok: true, status: 200, json: async () => endpoint.respond(url) };
+		},
+	});
+
+	const out = await provider.getTranslation(lyricsOf("uno"), "spotify:track:rot1", null, "en");
+	assert.deepEqual(
+		out.map((line) => line.text),
+		["T:uno"],
+	);
+	assert.deepEqual(clients, ["gtx", "dict-chrome-ex"]);
+	assert.equal(storage.getItem(COOLDOWN_KEY), null, "breaker opened although a client worked");
+	assert.equal(notifications.length, 0);
+
+	// The working client is remembered, so the next track does not pay for the
+	// throttled one again.
+	await provider.getTranslation(lyricsOf("dos"), "spotify:track:rot2", null, "en");
+	assert.deepEqual(clients.slice(2), ["dict-chrome-ex"]);
+});
+
+test("a non-rate-limit failure does not rotate clients", async () => {
+	const clients = [];
+	const { provider } = load({
+		fetchImpl: async (url) => {
+			clients.push(new URL(url).searchParams.get("client"));
+			throw new TypeError("network down");
+		},
+	});
+
+	assert.equal(await provider.getTranslation(lyricsOf("uno"), "spotify:track:rot3", null, "en"), null);
+	assert.deepEqual(clients, ["gtx"]);
 });
 
 test("a throttled track caches nothing, so it retries once the cooldown expires", async () => {

@@ -10,7 +10,8 @@
 // the target language are detected and skipped rather than glossed with a
 // pointless copy of themselves.
 //
-// Endpoint: translate.googleapis.com/translate_a/single (client=gtx, no key).
+// Endpoint: translate.googleapis.com/translate_a/single (client=gtx, falling
+// back to dict-chrome-ex when gtx is throttled; no key).
 
 const ProviderAutoTranslate = (() => {
 	const ENDPOINT = "https://translate.googleapis.com/translate_a/single";
@@ -79,9 +80,18 @@ const ProviderAutoTranslate = (() => {
 		}
 	}
 
-	function buildURL(text, sourceLang, targetLang) {
+	// The endpoint throttles per client identifier as well as per address:
+	// `gtx` can be answering Google's "Sorry…" page for an IP while
+	// `dict-chrome-ex` still answers normally, with an identical response shape
+	// (segments keep their newlines, detected language at index 2). So a rate
+	// limit rotates to the next client before the circuit breaker opens, and
+	// whichever client last worked is tried first from then on.
+	const CLIENTS = ["gtx", "dict-chrome-ex"];
+	let clientIndex = 0;
+
+	function buildURL(text, sourceLang, targetLang, client = CLIENTS[clientIndex]) {
 		const params = {
-			client: "gtx",
+			client,
 			sl: sourceLang || "auto",
 			tl: targetLang,
 			dt: "t",
@@ -163,8 +173,31 @@ const ProviderAutoTranslate = (() => {
 		throw new Error(errors.join(" | "));
 	}
 
+	// Only a rate limit is worth another client. Any other failure is thrown
+	// straight away, so a network outage still costs one request, not two.
+	async function requestAnyClient(text, sourceLang, targetLang) {
+		let lastError = null;
+
+		for (let attempt = 0; attempt < CLIENTS.length; attempt++) {
+			const index = (clientIndex + attempt) % CLIENTS.length;
+			try {
+				const parsed = await request(buildURL(text, sourceLang, targetLang, CLIENTS[index]));
+				if (index !== clientIndex) {
+					clientIndex = index;
+					console.log(`[auto-translate] switched to client=${CLIENTS[index]}`);
+				}
+				return parsed;
+			} catch (error) {
+				if (!isRateLimit(error)) throw error;
+				lastError = error;
+			}
+		}
+
+		throw lastError;
+	}
+
 	async function translateBlock(text, sourceLang, targetLang) {
-		const parsed = await request(buildURL(text, sourceLang, targetLang));
+		const parsed = await requestAnyClient(text, sourceLang, targetLang);
 		const segments = parsed[0];
 		if (!Array.isArray(segments)) return null;
 		return {
