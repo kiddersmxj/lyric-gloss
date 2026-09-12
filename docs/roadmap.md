@@ -11,6 +11,13 @@ single biggest thing missing for anyone deciding whether they want this.
 
 ## Worth doing next
 
+**Notice when a Spotify update has undone the install.** Today it fails
+silently: the patch is simply not loaded, so nothing of ours can report it, and
+the first sign is missing translations. A pacman hook on the `spotify` package
+that re-runs `install.sh`, or at least says it needs re-running, would close
+that — as would deriving the spicetify version floor from the installed Spotify
+instead of hard-coding it, since that floor moves with every client update.
+
 **Move the cooldown key out of the cache prefix.** `clearCache()` deletes
 everything under `lyrics-plus:auto-translate:`, and the circuit breaker's
 `until`/`step` live at `lyrics-plus:auto-translate:cooldown` — so clearing the

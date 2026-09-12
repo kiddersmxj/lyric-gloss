@@ -54,6 +54,12 @@ only to our own usage. Cosmos is kept as a fallback for builds that block
 direct fetch, and the chosen transport is tried first rather than exclusively,
 so a later failure can still fall back.
 
+The endpoint also throttles per client identifier, not only per address, so
+two are used: `gtx`, and `dict-chrome-ex`, which returns an identical response
+shape. A rate limit rotates to the other before the circuit breaker opens, and
+the one that worked is tried first from then on. Only rate limits rotate — any
+other failure is final, so an outage still costs a single request.
+
 ## Same-language detection
 
 Index 2 of the response is the language the service detected. The first chunk's

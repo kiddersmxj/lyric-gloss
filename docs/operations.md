@@ -46,10 +46,40 @@ restores `root:root` 755/644 on exit via a trap. Mtime mismatches on the two
 
 - `spicetify upgrade` replaces `CustomApps/` wholesale → the provider and all
   wiring vanish.
-- A Spotify package upgrade replaces `Apps/xpui.spa` → the patch is gone from
-  the client, and permissions reset to root.
+- A Spotify package upgrade — which arrives with an ordinary system upgrade —
+  puts fresh stock `Apps/xpui.spa` and `Apps/login.spa` back.
 
 Both are fixed by re-running `install.sh`.
+
+### Translations silently stop after a Spotify update
+
+**Symptom:** no gloss, no error, no notification. `Apps/` holds both the stock
+`.spa` archives and the old unpacked `xpui/` and `login/` directories. The
+provider's own diagnostics say nothing, because the patch is not running at all.
+
+**Cause:** Spotify loads the archive when both are present, so the old patched
+directory is ignored. Spicetify calls this state *mixed*. Seen 2026-09-08, 1.2.84
+→ 1.2.96.
+
+Three traps sit around it, all now handled by `install.sh`:
+
+- **The spicetify floor moves with Spotify.** 1.2.96 needs spicetify 2.45.0.
+  An older spicetify throws inside the lyrics route.
+- **`restore` can install the old bundle.** Spicetify decides whether its backup
+  matches from the version recorded at *last launch*, not from the binary. After
+  an update that has not been launched yet, `restore` copies the previous
+  version's bundle over the new client. The installer compares the backup
+  against the binary instead, and on a mismatch discards the stale unpacked
+  directories rather than restoring.
+- **Verification was fooled by the stale directory,** which still contains every
+  file it greps for. It now fails while any stock archive remains.
+
+To tell which Spotify is installed versus what the backup was taken from:
+
+```sh
+strings -n 8 /opt/spotify/spotify | grep -m1 -oE '^[0-9.]+\.g[0-9a-f]+$'
+sed -n '/\[Backup\]/,$p' ~/.config/spicetify/config-xpui.ini
+```
 
 ## Two Spotify packages
 
@@ -361,3 +391,26 @@ const scrollable = (el) => {
 `scrollHeight/clientHeight` and computed `overflowY` for each ancestor. Three
 attempts were spent tuning timing before anyone measured which element was
 being written to.
+
+## 429 from Google's "Sorry…" page, from your own address
+
+**Symptom:** translation fails with 429, and `curl` from the same machine gets
+an HTML page titled *Sorry…* rather than JSON — so this is not the spicetify
+proxy (see above) but the endpoint throttling the address directly.
+
+**Cause:** the endpoint throttles per client identifier as well as per address.
+Seen 2026-09-12: `client=gtx` blocked, `client=dict-chrome-ex` answering
+normally with an identical response shape.
+
+**Fix:** the provider rotates to the next client on a rate limit before opening
+the circuit breaker, and keeps using whichever worked. Check which clients the
+address can currently reach:
+
+```sh
+for c in gtx dict-chrome-ex; do
+  curl -s -o /dev/null -w "$c %{http_code}\n" -G \
+    https://translate.googleapis.com/translate_a/single \
+    --data-urlencode client=$c --data-urlencode sl=auto \
+    --data-urlencode tl=en --data-urlencode dt=t --data-urlencode q=hola
+done
+```
