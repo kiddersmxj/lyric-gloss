@@ -48,6 +48,28 @@ if [[ ! -x $SPICETIFY ]]; then
 	exit 1
 fi
 
+# Spicetify reads "which Spotify is installed" from the version Spotify recorded
+# at its LAST LAUNCH, and uses it both to judge whether its backup still matches
+# and to choose version-specific patches for the bundle. Straight after a
+# package upgrade — which is exactly when this runs from the pacman hook —
+# that is still the old version, so the new client would be patched as if it
+# were the old one. Record the version of the binary actually on disk first.
+#
+# Spotify rewrites prefs from memory when it exits, so if it is running now this
+# can be overwritten with the old value — harmless, since the patching below has
+# already used the right one, and the next launch records the truth anyway.
+installed_version=$(strings -n 8 "$SPOTIFY_DIR/spotify" | grep -m1 -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.g[0-9a-f]+$' || true)
+prefs_path=$(awk -F' *= *' '$1 == "prefs_path" { print $2; exit }' "$("$SPICETIFY" -c)" 2>/dev/null || true)
+prefs_path=${prefs_path:-$HOME/.config/spotify/prefs}
+
+if [[ -n $installed_version && -f $prefs_path ]]; then
+	if grep -q '^app\.last-launched-version=' "$prefs_path"; then
+		sed -i "s/^app\.last-launched-version=.*/app.last-launched-version=\"$installed_version\"/" "$prefs_path"
+	else
+		printf 'app.last-launched-version="%s"\n' "$installed_version" >> "$prefs_path"
+	fi
+fi
+
 # Spicetify must be new enough for the installed Spotify, or lyrics-plus throws
 # "Something went wrong" on the lyrics route and can take the client down with
 # it. 2.43.0 added 1.2.86, 2.44.0 added 1.2.93, 2.45.0 added 1.2.96. A spicetify
@@ -91,17 +113,24 @@ echo "==> configuring spicetify"
 "$SPICETIFY" config extensions lyric-gloss-playbar.js >/dev/null
 "$SPICETIFY" config current_theme lyric-gloss replace_colors 0 >/dev/null
 
-echo "==> applying (needs sudo to write $SPOTIFY_DIR)"
-restore_perms() {
-	sudo chown -R root:root "$SPOTIFY_DIR" 2>/dev/null || true
-	sudo find "$SPOTIFY_DIR/Apps" -type d -exec chmod 755 {} + 2>/dev/null || true
-	sudo find "$SPOTIFY_DIR/Apps" -type f -exec chmod 644 {} + 2>/dev/null || true
-	sudo chmod 755 "$SPOTIFY_DIR" 2>/dev/null || true
-}
-trap restore_perms EXIT
+if [[ ${LYRIC_GLOSS_HOOK:-} == 1 ]]; then
+	# Run by the pacman hook: it is already root, has opened $SPOTIFY_DIR, and
+	# restores ownership itself when this returns. No sudo, so no prompt in the
+	# middle of a package transaction.
+	echo "==> applying (permissions handled by the pacman hook)"
+else
+	echo "==> applying (needs sudo to write $SPOTIFY_DIR)"
+	restore_perms() {
+		sudo chown -R root:root "$SPOTIFY_DIR" 2>/dev/null || true
+		sudo find "$SPOTIFY_DIR/Apps" -type d -exec chmod 755 {} + 2>/dev/null || true
+		sudo find "$SPOTIFY_DIR/Apps" -type f -exec chmod 644 {} + 2>/dev/null || true
+		sudo chmod 755 "$SPOTIFY_DIR" 2>/dev/null || true
+	}
+	trap restore_perms EXIT
 
-sudo chmod a+wr "$SPOTIFY_DIR"
-sudo chmod -R a+wr "$SPOTIFY_DIR/Apps"
+	sudo chmod a+wr "$SPOTIFY_DIR"
+	sudo chmod -R a+wr "$SPOTIFY_DIR/Apps"
+fi
 
 # Always start from a pristine bundle. `backup apply` refuses outright when a
 # backup exists and Apps/ is already patched — it will not back up a patched
@@ -113,7 +142,6 @@ sudo chmod -R a+wr "$SPOTIFY_DIR/Apps"
 # launched yet it believes the old backup still matches, and `restore` copies
 # the previous version's bundle over the new client. Compare against the
 # binary instead.
-installed_version=$(strings -n 8 "$SPOTIFY_DIR/spotify" | grep -m1 -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.g[0-9a-f]+$' || true)
 backup_version=$(awk -F' *= *' '/^\[Backup\]/ { section = 1; next } /^\[/ { section = 0 } section && $1 == "version" { print $2; exit }' "$("$SPICETIFY" -c)")
 
 if [[ -n $backup_version && $backup_version != "$installed_version" ]]; then
@@ -123,6 +151,16 @@ if [[ -n $backup_version && $backup_version != "$installed_version" ]]; then
 	# from the new archives alone; `backup apply` then discards the stale
 	# backup itself. Only where the archive exists — without it, the
 	# directory is the client.
+	if ! compgen -G "$SPOTIFY_DIR/Apps/*.spa" >/dev/null; then
+		cat >&2 <<-EOF
+			No stock copy of Spotify ${installed_version:-} to rebuild from: the app
+			is already patched, and the only backup is of ${backup_version}.
+			Reinstall the Spotify package to put the stock files back, then re-run:
+
+			    sudo pacman -S spotify
+		EOF
+		exit 1
+	fi
 	for part in xpui login; do
 		if [[ -f "$SPOTIFY_DIR/Apps/$part.spa" && -d "$SPOTIFY_DIR/Apps/$part" ]]; then
 			rm -rf "${SPOTIFY_DIR:?}/Apps/${part:?}"
