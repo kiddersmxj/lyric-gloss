@@ -50,9 +50,10 @@ fi
 
 # Spicetify must be new enough for the installed Spotify, or lyrics-plus throws
 # "Something went wrong" on the lyrics route and can take the client down with
-# it. 2.43.0 added 1.2.86, 2.44.0 added 1.2.93. A spicetify older than your
-# Spotify is the thing to suspect first.
-MIN_SPICETIFY=2.44.0
+# it. 2.43.0 added 1.2.86, 2.44.0 added 1.2.93, 2.45.0 added 1.2.96. A spicetify
+# older than your Spotify is the thing to suspect first — and Spotify updates
+# with ordinary system upgrades, so this floor has to move with it.
+MIN_SPICETIFY=2.45.0
 have=$("$SPICETIFY" -v | tr -d '[:space:]')
 if [[ $(printf '%s\n%s\n' "$MIN_SPICETIFY" "$have" | sort -V | head -1) != "$MIN_SPICETIFY" ]]; then
 	echo "==> spicetify $have is older than $MIN_SPICETIFY — upgrading"
@@ -104,13 +105,46 @@ sudo chmod -R a+wr "$SPOTIFY_DIR/Apps"
 
 # Always start from a pristine bundle. `backup apply` refuses outright when a
 # backup exists and Apps/ is already patched — it will not back up a patched
-# client — which silently leaves the previous build in place. Restoring first
-# also handles the case where Spotify was upgraded since the last backup.
-"$SPICETIFY" restore >/dev/null 2>&1 || true
-"$SPICETIFY" backup apply
+# client — which silently leaves the previous build in place.
+#
+# But restoring is only safe when the backup belongs to the Spotify that is
+# actually installed. Spicetify decides that from the version recorded at LAST
+# LAUNCH, not from the binary, so after a package upgrade that has not been
+# launched yet it believes the old backup still matches, and `restore` copies
+# the previous version's bundle over the new client. Compare against the
+# binary instead.
+installed_version=$(strings -n 8 "$SPOTIFY_DIR/spotify" | grep -m1 -oE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.g[0-9a-f]+$' || true)
+backup_version=$(awk -F' *= *' '/^\[Backup\]/ { section = 1; next } /^\[/ { section = 0 } section && $1 == "version" { print $2; exit }' "$("$SPICETIFY" -c)")
+
+if [[ -n $backup_version && $backup_version != "$installed_version" ]]; then
+	echo "==> Spotify updated since the last install (${backup_version} → ${installed_version:-unknown})"
+	# The package puts fresh stock archives back and leaves the old version's
+	# unpacked directories beside them. Drop those so the new bundle is built
+	# from the new archives alone; `backup apply` then discards the stale
+	# backup itself. Only where the archive exists — without it, the
+	# directory is the client.
+	for part in xpui login; do
+		if [[ -f "$SPOTIFY_DIR/Apps/$part.spa" && -d "$SPOTIFY_DIR/Apps/$part" ]]; then
+			rm -rf "${SPOTIFY_DIR:?}/Apps/${part:?}"
+		fi
+	done
+else
+	"$SPICETIFY" -n restore >/dev/null 2>&1 || true
+fi
+
+# -n: do not let spicetify relaunch Spotify. A Spotify started from this
+# script's shell breaks end-of-track auto-advance (see docs/operations.md).
+"$SPICETIFY" -n backup apply
 
 echo "==> verifying"
 fail=0
+# A stock archive beside the unpacked bundle means Spotify loads the archive and
+# ignores the patch — and the stale directory still greps as fully installed.
+# That is exactly how a Spotify update presented: everything below "present",
+# nothing actually running. So check the archives are gone first.
+for part in xpui login; do
+	[[ -f "$SPOTIFY_DIR/Apps/$part.spa" ]] && { echo "  STOCK ARCHIVE STILL PRESENT: Apps/$part.spa — Spotify will load it instead of the patch" >&2; fail=1; }
+done
 grep -rq ProviderAutoTranslate "$SPOTIFY_DIR/Apps/xpui/" || { echo "  MISSING: translation provider" >&2; fail=1; }
 grep -q "nth-of-type(2)" "$SPOTIFY_DIR/Apps/xpui/user.css" || { echo "  MISSING: gloss stylesheet" >&2; fail=1; }
 grep -rq "data-lyric-gloss-bound" "$SPOTIFY_DIR/Apps/xpui/" || { echo "  MISSING: playbar extension" >&2; fail=1; }
@@ -121,7 +155,8 @@ fi
 echo "  provider, stylesheet and playbar extension all present in the client"
 
 echo
-echo "Done. Restart Spotify. The playbar lyrics button is now this app."
+echo "Done. Quit Spotify and start it again from your launcher — not from this"
+echo "terminal. The playbar lyrics button is now this app."
 echo "There is nothing to configure — auto-translate to English, glossed below"
 echo "the original, is baked in. To change the target language, edit patch.py"
 echo "and re-run this script. See README.md."
