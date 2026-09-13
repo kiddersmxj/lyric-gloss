@@ -126,53 +126,98 @@ else
 		sudo find "$SPOTIFY_DIR/Apps" -type f -exec chmod 644 {} + 2>/dev/null || true
 		sudo chmod 755 "$SPOTIFY_DIR" 2>/dev/null || true
 	}
-	trap restore_perms EXIT
-
 	sudo chmod a+wr "$SPOTIFY_DIR"
 	sudo chmod -R a+wr "$SPOTIFY_DIR/Apps"
 fi
 
-# Always start from a pristine bundle. `backup apply` refuses outright when a
-# backup exists and Apps/ is already patched — it will not back up a patched
-# client — which silently leaves the previous build in place.
-#
-# But restoring is only safe when the backup belongs to the Spotify that is
-# actually installed. Spicetify decides that from the version recorded at LAST
-# LAUNCH, not from the binary, so after a package upgrade that has not been
-# launched yet it believes the old backup still matches, and `restore` copies
-# the previous version's bundle over the new client. Compare against the
-# binary instead.
-backup_version=$(awk -F' *= *' '/^\[Backup\]/ { section = 1; next } /^\[/ { section = 0 } section && $1 == "version" { print $2; exit }' "$("$SPICETIFY" -c)")
+# Set once the patched client has been taken down to rebuild it. If the script
+# ends — failure or Ctrl-C — while this is set, Spotify is running stock on its
+# next launch, and that must be said out loud: a silent stock client is exactly
+# how a previous interrupted run went unnoticed until the next day.
+client_torn_down=0
 
-if [[ -n $backup_version && $backup_version != "$installed_version" ]]; then
-	echo "==> Spotify updated since the last install (${backup_version} → ${installed_version:-unknown})"
-	# The package puts fresh stock archives back and leaves the old version's
-	# unpacked directories beside them. Drop those so the new bundle is built
-	# from the new archives alone; `backup apply` then discards the stale
-	# backup itself. Only where the archive exists — without it, the
-	# directory is the client.
-	if ! compgen -G "$SPOTIFY_DIR/Apps/*.spa" >/dev/null; then
-		cat >&2 <<-EOF
-			No stock copy of Spotify ${installed_version:-} to rebuild from: the app
-			is already patched, and the only backup is of ${backup_version}.
-			Reinstall the Spotify package to put the stock files back, then re-run:
-
-			    sudo pacman -S spotify
-		EOF
-		exit 1
+on_exit() {
+	local status=$?
+	if declare -F restore_perms >/dev/null; then
+		restore_perms
 	fi
+	if ((status != 0 && client_torn_down)); then
+		cat >&2 <<-EOF
+
+			!! Stopped part way through rebuilding. Spotify is now UNPATCHED — no
+			!! lyric translations after its next launch. Run this again to finish:
+
+			    $HERE/install.sh
+		EOF
+	fi
+}
+trap on_exit EXIT
+
+# Pick the least destructive route to a patched client.
+#
+# Rebuilding means backing up stock files, and a backup needs a stock client —
+# so on an already-patched client it means restoring first, i.e. tearing down
+# the working patch before a rebuild that can still fail, be rate limited, or be
+# interrupted. A re-run that died a second in once left Spotify stock this way.
+# So only rebuild when there is no other option:
+#
+#   stock files present          nothing patched to lose → rebuild from them
+#   backup matches this Spotify
+#     and this spicetify         re-apply in place → nothing torn down
+#   otherwise                    restore + rebuild → the only destructive path
+#
+# "This Spotify" means the binary on disk, not spicetify's last-launched version
+# — see the version recording near the top.
+config_file=$("$SPICETIFY" -c)
+backup_field() {
+	awk -F' *= *' -v key="$1" '/^\[Backup\]/ { section = 1; next } /^\[/ { section = 0 } section && $1 == key { print $2; exit }' "$config_file"
+}
+backup_version=$(backup_field version)
+backup_with=$(backup_field with)
+spicetify_version=$("$SPICETIFY" -v | tr -d '[:space:]')
+backup_folder="${XDG_STATE_HOME:-$HOME/.local/state}/spicetify/Backup"
+
+# -n on every spicetify call: never let it relaunch Spotify. A Spotify started
+# from this script's shell breaks end-of-track auto-advance
+# (see docs/operations.md).
+if compgen -G "$SPOTIFY_DIR/Apps/*.spa" >/dev/null; then
+	if [[ -n $backup_version && $backup_version != "$installed_version" ]]; then
+		echo "==> Spotify updated since the last install (${backup_version} → ${installed_version:-unknown})"
+	else
+		echo "==> building from stock Spotify files"
+	fi
+	# A package update leaves the old version's unpacked directories beside
+	# the fresh archives. Drop them so the bundle is built from the archives
+	# alone; `backup apply` discards any stale backup itself.
 	for part in xpui login; do
 		if [[ -f "$SPOTIFY_DIR/Apps/$part.spa" && -d "$SPOTIFY_DIR/Apps/$part" ]]; then
 			rm -rf "${SPOTIFY_DIR:?}/Apps/${part:?}"
 		fi
 	done
-else
-	"$SPICETIFY" -n restore >/dev/null 2>&1 || true
-fi
+	"$SPICETIFY" -n backup apply
 
-# -n: do not let spicetify relaunch Spotify. A Spotify started from this
-# script's shell breaks end-of-track auto-advance (see docs/operations.md).
-"$SPICETIFY" -n backup apply
+elif [[ $backup_version == "$installed_version" && $backup_with == "$spicetify_version" ]] &&
+	compgen -G "$backup_folder/*.spa" >/dev/null; then
+	echo "==> re-applying in place (nothing is taken down)"
+	"$SPICETIFY" -n apply
+
+elif [[ $backup_version == "$installed_version" ]] && compgen -G "$backup_folder/*.spa" >/dev/null; then
+	echo "==> spicetify changed (${backup_with:-unknown} → $spicetify_version): rebuilding"
+	client_torn_down=1
+	"$SPICETIFY" -n restore
+	"$SPICETIFY" -n backup apply
+	client_torn_down=0
+
+else
+	cat >&2 <<-EOF
+		No stock copy of Spotify ${installed_version:-} to rebuild from: the app is
+		already patched, and spicetify's backup is of ${backup_version:-nothing}.
+		Reinstall the Spotify package to put the stock files back, then re-run:
+
+		    sudo pacman -S spotify
+	EOF
+	exit 1
+fi
 
 echo "==> verifying"
 fail=0

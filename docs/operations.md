@@ -81,6 +81,35 @@ strings -n 8 /opt/spotify/spotify | grep -m1 -oE '^[0-9.]+\.g[0-9a-f]+$'
 sed -n '/\[Backup\]/,$p' ~/.config/spicetify/config-xpui.ini
 ```
 
+### Spotify breaks the morning after a re-run of the installer
+
+**Symptom:** hours later, Spotify shows an error page; pressing reload gives
+*"xpui.app.spotify.com's server IP address could not be found"*
+(ERR_NAME_NOT_RESOLVED). After relaunching, Spotify works but there are no
+lyric translations. `Apps/` contains only the stock `.spa` archives, and
+spicetify's `[Backup]` record is blank.
+
+The reload page is a red herring: the UI is served from inside the app, and a
+Chromium reload tries to fetch that virtual host over the network.
+
+**Cause:** seen 2026-09-12 — two installer runs a minute apart, the second over
+within a second (sudo's journal shows the permission window opening and closing
+at 22:37:31–32). Every run used to restore stock *before* rebuilding, so the
+second run tore down the working patch and then stopped, most likely
+interrupted. Spotify carried on from what it had already loaded until it next
+needed a file.
+
+**Fix:** the installer now takes the least destructive route — rebuild only when
+stock files are already present, otherwise re-apply in place, and restore only
+when spicetify itself has changed and the rebuild is unavoidable. If a run stops
+while the client is torn down, it prints that Spotify is unpatched.
+
+To see which installer runs touched `/opt`, and for how long:
+
+```sh
+journalctl -q _COMM=sudo --since today | grep -E 'COMMAND=.*(chmod a\+wr|chown -R root:root) /opt/spotify'
+```
+
 ### The pacman hook
 
 `install-hook.sh` installs two root-owned files: the trigger at
