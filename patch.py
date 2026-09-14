@@ -7,6 +7,7 @@ upstream rather than corrupting the file.
 
     python3 patch.py apply    ~/.spicetify
     python3 patch.py remove   ~/.spicetify
+    python3 patch.py check    ~/.spicetify   # which anchors a release breaks
 """
 
 import shutil
@@ -455,6 +456,49 @@ def apply(app: Path) -> None:
     print("patched lyrics-plus")
 
 
+def check(app: Path) -> None:
+    """List every anchor that does not match, without writing anything.
+
+    For a new lyrics-plus release: apply stops at the first moved anchor, which
+    turns re-anchoring into one install attempt per broken edit. An
+    already-patched tree is first unpatched in memory, so its own replacements
+    are not reported as missing anchors. An edit that anchors on text an earlier
+    edit introduces will also fail if that earlier edit did — fix from the top.
+    """
+    texts: dict[str, str] = {}
+
+    def read(name: str) -> str:
+        if name not in texts:
+            text = (app / name).read_text()
+            for retired_name, patched, original in RETIRED:
+                if retired_name == name:
+                    text = text.replace(patched, original)
+            for edit_name, anchor, replacement in reversed(EDITS):
+                if edit_name == name:
+                    text = text.replace(replacement, anchor)
+            texts[name] = text
+        return texts[name]
+
+    broken = []
+    for index, (name, anchor, replacement) in enumerate(EDITS):
+        text = read(name)
+        count = text.count(anchor)
+        if count == 1:
+            texts[name] = text.replace(anchor, replacement)
+        else:
+            broken.append((index, name, count, anchor))
+
+    if not broken:
+        print(f"all {len(EDITS)} anchors match")
+        return
+
+    print(f"{len(broken)} of {len(EDITS)} anchors do not match exactly once:")
+    for index, name, count, anchor in broken:
+        first = anchor.strip().splitlines()[0][:70]
+        print(f"  edit {index:>2}  {name:<15} found {count}x  {first}")
+    sys.exit(1)
+
+
 def remove(app: Path) -> None:
     undo_retired(app)
 
@@ -486,6 +530,7 @@ def remove(app: Path) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3 or sys.argv[1] not in {"apply", "remove"}:
+    actions = {"apply": apply, "remove": remove, "check": check}
+    if len(sys.argv) != 3 or sys.argv[1] not in actions:
         sys.exit(__doc__)
-    {"apply": apply, "remove": remove}[sys.argv[1]](app_dir(Path(sys.argv[2]).expanduser()))
+    actions[sys.argv[1]](app_dir(Path(sys.argv[2]).expanduser()))

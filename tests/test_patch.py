@@ -168,6 +168,25 @@ def test_manifest_lists_the_provider_and_stays_valid_json(spice):
 # --- failure behaviour ------------------------------------------------------
 
 
+def test_check_reports_every_broken_anchor_and_writes_nothing(spice):
+    """`check` is for a new lyrics-plus release: it must list every anchor that
+    no longer matches, not stop at the first like apply does, and never touch
+    the tree."""
+    app = spice / "CustomApps" / "lyrics-plus"
+    ok = run("check", spice)
+    assert "all" in ok.stdout and "match" in ok.stdout
+
+    # Break two unrelated anchors, as an upstream release would.
+    index = app / "index.js"
+    first, second = [e[1] for e in patch.EDITS if e[0] == "index.js"][:2]
+    index.write_text(index.read_text().replace(first, "/* moved */").replace(second, "/* moved too */"))
+    before = snapshot(app)
+
+    result = run("check", spice, expect=1)
+    assert result.stdout.count("index.js") >= 2, result.stdout
+    assert snapshot(app) == before
+
+
 def test_apply_refuses_when_an_anchor_has_moved(spice):
     """Upstream drift must fail loudly rather than corrupt the app."""
     app = spice / "CustomApps" / "lyrics-plus"
