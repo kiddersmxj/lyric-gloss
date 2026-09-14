@@ -74,12 +74,15 @@ directly as root would make any write to the user's home a root escalation.
 
 ## Working on it
 
-- `./test` before anything ships. It covers the patch round-trip, atomicity,
+- `make test` before anything ships (`make help` for every target). It covers the patch round-trip, atomicity,
   the `RETIRED` sweep, and the provider's alignment, skip, cache and circuit
   breaker — all offline, against a synthetic fixture and a fake endpoint. Add
   a case for any behaviour you had to debug; that is what it is for.
-- `python3 patch.py apply|remove ~/.spicetify` — idempotent; refuses if any
-  anchor isn't found exactly once, so upstream drift fails loudly.
+- `python3 patch.py apply|remove|check ~/.spicetify` — idempotent; refuses if any
+  anchor isn't found exactly once, so upstream drift fails loudly. `make anchors`
+  lists every broken anchor after a spicetify upgrade.
+- `make status` first when something "quietly stopped": it shows whether the
+  running bundle holds the current patch, which has been the answer repeatedly.
 - The suite proves the machinery, not that the anchors still match the
   *installed* lyrics-plus. Still do one real round-trip against your own tree
   before shipping a patch change: remove → snapshot → apply → remove →
@@ -93,8 +96,8 @@ directly as root would make any write to the user's home a root escalation.
 Do not guess at DOM selectors. Enable developer mode and query it:
 
 ```sh
-~/.spicetify/spicetify enable-devtools      # only sticks if Spotify is CLOSED
-curl -s http://127.0.0.1:8088/json          # find the page target's ws:// URL
+make devtools-on                    # quits Spotify; the user starts it from their launcher
+curl -s http://127.0.0.1:8088/json  # find the page target's ws:// URL
 ```
 
 Then drive it over CDP (`Runtime.evaluate`). Four selector guesses were shipped
@@ -113,8 +116,9 @@ user's time three times:
 - Spotify writes that key back to `true` after starting, so the file showing
   `true` while the channel is closed is normal. Do not judge by the file.
 
-Verify with `curl -s http://127.0.0.1:8088/json/version` — a CDP-specific path.
-Checking whether *anything* answers on 8088 proves nothing.
+`make devtools-off` does all of that correctly, and `make devtools-check` tests the
+CDP-specific path `http://127.0.0.1:8088/json/version`. Checking whether
+*anything* answers on 8088 proves nothing.
 
 ## Rules that are not about code
 

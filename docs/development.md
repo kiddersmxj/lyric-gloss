@@ -13,7 +13,9 @@ patch.py                        text edits against vendored lyrics-plus
 install.sh, uninstall.sh        orchestration
 install-hook.sh                 installs the pacman hook (Arch)
 hooks/                          the hook trigger and its root-side action
+Makefile                        every command; `make help`
 test                            test runner — patch, provider, shell
+scripts/                        status, developer mode, LRCLIB comparison
 tests/test_patch.py             patch round-trip, atomicity, retired sweep
 tests/provider.test.mjs         provider behaviour against a fake endpoint
 tests/fixtures/lyrics-plus/     synthetic stand-in for the upstream app
@@ -38,22 +40,31 @@ those two directories untracked there for the same reason.
 
 ## Commands
 
-```sh
-./install.sh                          # patch, configure, apply, verify
-./uninstall.sh                        # restore stock client, unpatch
-python3 patch.py apply  ~/.spicetify  # patch only
-python3 patch.py remove ~/.spicetify  # unpatch only
-```
+`make help` lists all of them. Nothing here starts Spotify — start it from your
+launcher afterwards, since a script-launched client breaks auto-advance.
 
-`install.sh` needs sudo, but only to write `/opt/spotify` during the apply; it
-restores `root:root` 755/644 through an `EXIT` trap.
+| | |
+|---|---|
+| `make test` / `test-patch` / `test-provider` / `lint` | the suite, or one part of it |
+| `make status` | one screen: versions, bundle state, source anchors, hook, developer mode, endpoint |
+| `make install` / `uninstall` | patch and apply / restore stock. One sudo prompt each |
+| `make anchors` | after a spicetify upgrade: every anchor its lyrics-plus breaks, nothing written |
+| `make runs` | today's installer runs from sudo's journal — when `/opt` was opened and closed |
+| `make lrclib Q="title artist"` | how much LRCLIB's timings disagree for a song |
+| `make hook-install` / `hook-test` / `hook-log` | the pacman hook |
+| `make devtools-on` / `devtools-off` / `devtools-check` | developer mode; on and off quit Spotify first |
+
+The scripts behind them — `install.sh`, `patch.py apply|remove|check`,
+`scripts/*` — can still be run directly. `install.sh` needs sudo only to write
+`/opt/spotify` during the apply, and restores `root:root` 755/644 through an
+`EXIT` trap.
 
 ## Testing
 
 ```sh
-./test              # everything: patch round-trip, provider, shell syntax, shellcheck
-./test patch        # patch.py only          (pytest, tests/test_patch.py)
-./test provider     # the provider only      (node:test, tests/provider.test.mjs)
+make test           # everything: patch round-trip, provider, shell syntax, shellcheck
+make test-patch     # patch.py only          (pytest, tests/test_patch.py)
+make test-provider  # the provider only      (node:test, tests/provider.test.mjs)
 ```
 
 Everything runs offline. The patch tests work against a synthetic `lyrics-plus`

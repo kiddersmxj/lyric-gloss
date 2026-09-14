@@ -65,10 +65,12 @@ one throws inside the lyrics route and can take the client down with it.
 ```sh
 git clone https://github.com/kiddersmxj/lyric-gloss
 cd lyric-gloss
-./install.sh
+make install
 ```
 
-Then restart Spotify. That's it — there is nothing to configure.
+Then quit Spotify and start it from your launcher. That's it — there is nothing
+to configure. `make help` lists every other target; `make status` shows what is
+installed and whether it is working.
 
 The playbar lyrics button now opens this page. Spotify's own lyrics panel and
 the redundant sidebar entry are hidden, so there is one control, where you'd
@@ -95,7 +97,7 @@ the lyrics themselves, to the translation endpoint, to be translated.
 ## Uninstall
 
 ```sh
-./uninstall.sh
+make uninstall
 ```
 
 Restores the stock bundle and unpatches `lyrics-plus` byte-for-byte. It prints
@@ -109,7 +111,7 @@ app files back, and Spotify loads those instead of the patch.
 **On Arch, install the pacman hook once and forget about it:**
 
 ```sh
-./install-hook.sh
+make hook-install
 ```
 
 From then on, every upgrade of the `spotify` package — including AUR helper
@@ -117,9 +119,9 @@ updates, which still go through pacman — re-applies lyric-gloss automatically,
 upgrading spicetify first if a newer release exists. Nothing prompts during the
 upgrade. Afterwards, quit Spotify and start it from your launcher. The hook runs
 the installer from wherever this repository was when you installed it, so re-run
-`./install-hook.sh` if you move it.
+`make hook-install` if you move it.
 
-**Otherwise,** re-run `./install.sh` after any Spotify package upgrade or
+**Otherwise,** re-run `make install` after any Spotify package upgrade or
 `spicetify upgrade`. Re-running is always safe: it unpatches first, so changes
 to the patch set are picked up rather than skipped.
 
@@ -138,7 +140,7 @@ the source:
 '\t\t"translate:translated-lyrics-source": "autoTranslation:en",'
 ```
 
-Then `./install.sh` again. Twelve targets are available — `en`, `es`, `fr`,
+Then `make install` again. Twelve targets are available — `en`, `es`, `fr`,
 `de`, `it`, `pt`, `nl`, `ja`, `ko`, `zh`, `ru`, `ar` — listed in `TARGETS` in
 `src/ProviderAutoTranslate.js`. The other baked-in defaults (below-original
 gloss, left alignment, synced mode, expanded view) are adjacent in `patch.py`
@@ -182,9 +184,9 @@ with or endorsed by Spotify.
 ## Development
 
 ```sh
-./test              # the whole suite: patch round-trip, provider, shell syntax
-./test patch        # patch.py only
-./test provider     # the translation provider only
+make test           # the whole suite: patch round-trip, provider, shell syntax
+make test-patch     # patch.py only
+make test-provider  # the translation provider only
 ```
 
 Everything runs offline — no spicetify install, no Spotify, no network. The

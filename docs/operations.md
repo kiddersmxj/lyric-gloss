@@ -104,11 +104,7 @@ stock files are already present, otherwise re-apply in place, and restore only
 when spicetify itself has changed and the rebuild is unavoidable. If a run stops
 while the client is torn down, it prints that Spotify is unpatched.
 
-To see which installer runs touched `/opt`, and for how long:
-
-```sh
-journalctl -q _COMM=sudo --since today | grep -E 'COMMAND=.*(chmod a\+wr|chown -R root:root) /opt/spotify'
-```
+To see which installer runs touched `/opt`, and for how long: `make runs`.
 
 ### A fix is committed but Spotify behaves as before
 
@@ -126,18 +122,9 @@ A `spicetify upgrade` also leaves our provider file behind in the otherwise
 stock app, so the directory looks half-installed.
 
 **Check which anchors a lyrics-plus release breaks** before running anything:
-
-```sh
-python3 - <<'EOF'
-import importlib.util, pathlib
-s = importlib.util.spec_from_file_location("p", "patch.py"); p = importlib.util.module_from_spec(s); s.loader.exec_module(p)
-app, staged = pathlib.Path.home() / ".spicetify/CustomApps/lyrics-plus", {}
-for i, (name, anchor, repl) in enumerate(p.EDITS):
-    text = staged.get(name) or (app / name).read_text()
-    if text.count(anchor) == 1: staged[name] = text.replace(anchor, repl)
-    else: print(i, name, repr(anchor.strip().splitlines()[0][:70]))
-EOF
-```
+`make anchors`. It lists all of them, not just the first, and writes nothing.
+`make status` also shows whether the next install would apply, and whether the
+running bundle actually contains the current patch.
 
 **When re-anchoring,** prefer the start of a neighbouring declaration over the
 last line of a block: blocks grow at the end, which is exactly what broke here.
@@ -161,10 +148,11 @@ and the installer it calls runs as the user. It never fails the package
 transaction — a failure prints a `:: lyric-gloss:` line and is swallowed.
 
 **Symptom it prints on failure:** `re-apply FAILED — lyric translations are off`.
-Full output from every run is appended to `/var/log/lyric-gloss.log`.
+Full output from every run is appended to `/var/log/lyric-gloss.log`;
+`make hook-log` shows the recent part.
 
-**To exercise it without waiting for an update:** `sudo pacman -S spotify`
-reinstalls the current version, which fires the hook.
+**To exercise it without waiting for an update:** `make hook-test`, which
+reinstalls the current Spotify and so fires the hook.
 
 **It assumes** spicetify at `~/.spicetify` and the repository still at the path
 it was installed from. Moving the repository makes the hook skip with a message;
@@ -525,8 +513,4 @@ track that still drifts is almost certainly one only LRCLIB has.
 
 **Which source served a song:** the credit line at the bottom of the lyrics page.
 To see how much LRCLIB's entries disagree for a track:
-
-```sh
-curl -sG https://lrclib.net/api/search --data-urlencode 'q=<title> <artist>' |
-  python3 -c "import sys,json,re; [print(round(r['duration']), re.search(r'\[(\d+:[\d.]+)\]', r['syncedLyrics']).group(1)) for r in json.load(sys.stdin) if r.get('syncedLyrics') and r.get('duration')]"
-```
+`make lrclib Q="title artist"`.
