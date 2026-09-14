@@ -113,6 +113,22 @@ def test_remove_on_an_unpatched_tree_is_a_no_op(spice):
     assert snapshot(app) == before
 
 
+def test_remove_cleans_a_stray_provider_from_an_unpatched_tree(spice):
+    """A `spicetify upgrade` replaces lyrics-plus's own files with stock copies
+    but leaves any extra file behind — so after one, the app is unpatched while
+    our provider still sits in the directory. Seen for real after upgrading to
+    spicetify 2.45.0. remove must delete it even though there is nothing to
+    unpatch, or the tree can never get back to stock."""
+    app = spice / "CustomApps" / "lyrics-plus"
+    before = snapshot(app)
+    stray = app / "ProviderAutoTranslate.js"
+    stray.write_text("// left over from an earlier install\n")
+
+    run("remove", spice)
+    assert not stray.exists()
+    assert snapshot(app) == before
+
+
 def test_apply_remove_apply_matches_a_single_apply(spice):
     """Re-running install.sh removes first, so this is the real-world path."""
     app = spice / "CustomApps" / "lyrics-plus"

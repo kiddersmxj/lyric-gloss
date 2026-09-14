@@ -459,7 +459,15 @@ def remove(app: Path) -> None:
     undo_retired(app)
 
     if not is_patched(app):
-        print("not patched — nothing to do")
+        # `spicetify upgrade` swaps lyrics-plus's own files for stock copies but
+        # leaves extra files alone, so the provider can outlive the patch. Our
+        # file either way, so clean it up even when there is nothing to unpatch.
+        provider = app / "ProviderAutoTranslate.js"
+        if provider.exists():
+            provider.unlink()
+            print("not patched — removed a leftover ProviderAutoTranslate.js")
+        else:
+            print("not patched — nothing to do")
         return
 
     # Reverse order, for the same chaining reason as apply().
