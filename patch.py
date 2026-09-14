@@ -131,6 +131,21 @@ EDITS = [
         '\t\t"synced-compact": getConfig("lyrics-plus:visual:synced-compact"),',
         '\t\t"synced-compact": false,',
     ),
+    # Lyric sources, most accurately timed first. lyrics-plus takes the FIRST
+    # source that has any lyrics, and upstream puts LRCLIB first. LRCLIB is
+    # hand-timed by volunteers against whatever release they had: measured for
+    # one popular track, the 11 entries it accepts as the same recording (within
+    # 2s of its length) start the first line anywhere from 6s to 28s in, and one
+    # times the last line past the end of the track. So lyrics ran early on one
+    # song and late on the next. Spotify's own lyrics are timed to the exact
+    # recording, and Musixmatch is looked up by that same track ID; LRCLIB stays
+    # as the fallback. Forced, not defaulted: the menu that sets it is hidden.
+    # The parse below still validates it against the provider list.
+    (
+        "index.js",
+        '\tprovidersOrder: localStorage.getItem("lyrics-plus:services-order"),',
+        '\tprovidersOrder: JSON.stringify(["spotify", "musixmatch", "lrclib", "netease", "genius", "local"]),',
+    ),
     # Lock to synced (mode 1) so the karaoke/synced/unsynced tabs are moot.
     (
         "index.js",

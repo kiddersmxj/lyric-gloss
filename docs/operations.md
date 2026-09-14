@@ -472,3 +472,29 @@ for c in gtx dict-chrome-ex; do
     --data-urlencode tl=en --data-urlencode dt=t --data-urlencode q=hola
 done
 ```
+
+## Lyrics run early on one song and late on the next
+
+**Symptom:** the highlighted line is ahead of the vocal on some tracks and
+behind it on others, by several seconds, while scrolling and the gloss are fine.
+
+**Cause:** where the timings came from. lyrics-plus takes the first source that
+has any lyrics, and upstream's first is LRCLIB, which is hand-timed by volunteers
+against whatever release they had. Measured 2026-09-14 for one popular track:
+the 11 entries LRCLIB accepts as the same recording (within 2s of its length)
+start the first line anywhere from 6s to 28s in, and one times the last line past
+the end of the track. Which entry you get decides the error. Lyric-file offset
+tags are not the cause — none turned up in the sample.
+
+**Fix:** the source order is forced to Spotify's own lyrics, then Musixmatch,
+then LRCLIB. Spotify's are timed to the exact recording and Musixmatch is looked
+up by the same track ID, so LRCLIB is only used when neither has the song. A
+track that still drifts is almost certainly one only LRCLIB has.
+
+**Which source served a song:** the credit line at the bottom of the lyrics page.
+To see how much LRCLIB's entries disagree for a track:
+
+```sh
+curl -sG https://lrclib.net/api/search --data-urlencode 'q=<title> <artist>' |
+  python3 -c "import sys,json,re; [print(round(r['duration']), re.search(r'\[(\d+:[\d.]+)\]', r['syncedLyrics']).group(1)) for r in json.load(sys.stdin) if r.get('syncedLyrics') and r.get('duration')]"
+```

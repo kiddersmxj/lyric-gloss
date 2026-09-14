@@ -24,6 +24,7 @@ const CONFIG = {
 		"synced-compact": getConfig("lyrics-plus:visual:synced-compact"),
 		"playbar-button": getConfig("lyrics-plus:visual:playbar-button", false),
 	},
+	providersOrder: localStorage.getItem("lyrics-plus:services-order"),
 	locked: localStorage.getItem("lyrics-plus:lock-mode") || "-1",
 };
 
