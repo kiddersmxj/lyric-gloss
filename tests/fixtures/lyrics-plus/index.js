@@ -48,6 +48,10 @@ class LyricsContainer {
 		this._musixmatchTranslationRequestId = null;
 	}
 
+	infoFromTrack(track) {
+		return track;
+	}
+
 	setState(next) {
 		this.state = { ...this.state, ...next };
 	}

@@ -22,42 +22,16 @@ EDITS = [
         'neteaseTranslation: null,\n\t\t\turi: "",',
         'neteaseTranslation: null,\n\t\t\tautoTranslation: null,\n\t\t\turi: "",',
     ),
+    # The auto-translate request method, added to the lyrics container class.
+    # Anchored on the start of the method that follows the constructor, NOT on
+    # the constructor's last line: spicetify 2.45.0 added a field there
+    # (`this._romanizing = false;`) and the old anchor stopped matching. The
+    # method's own state is initialised lazily for the same reason — an unset
+    # key simply compares unequal — so the constructor is not touched at all.
     (
         "index.js",
-        "\t\tthis._musixmatchTranslationRequestId = null;\n\t}",
-        """\t\tthis._musixmatchTranslationRequestId = null;
-\t\tthis._autoTranslateKey = null;
-\t}
-
-\t// Machine-translate the current lyrics for the auto-translate source.
-\t// Called from lyricsSource(), which runs during render, so this must never
-\t// setState synchronously — the request is keyed and resolves later.
-\trequestAutoTranslation(uri, lyrics, sourceLang, targetLang) {
-\t\tif (typeof ProviderAutoTranslate === "undefined" || !Array.isArray(lyrics) || !lyrics.length) return;
-
-\t\tconst key = `${uri}::${targetLang}::${lyrics.length}::${lyrics[0]?.text ?? ""}`;
-\t\tif (this._autoTranslateKey === key) return;
-\t\tthis._autoTranslateKey = key;
-
-\t\t// detectLanguage() only recognises CJK, so it is undefined for most
-\t\t// languages. Let the service auto-detect unless there is an override.
-\t\tconst override = CONFIG.visual["translate:detect-language-override"];
-\t\tconst from = override !== "off" ? override.slice(0, 2) : /^[a-z]{2}$/.test(sourceLang ?? "") ? sourceLang : null;
-
-\t\tProviderAutoTranslate.getTranslation(lyrics, uri, from, targetLang)
-\t\t\t.then((translated) => {
-\t\t\t\tif (this._autoTranslateKey !== key) return;
-\t\t\t\tCACHE[uri] = { ...CACHE[uri], autoTranslation: translated };
-\t\t\t\tthis.setState({ autoTranslation: translated });
-\t\t\t})
-\t\t\t.catch((error) => {
-\t\t\t\t// Deliberately keep the key set. lyricsSource() runs on every
-\t\t\t\t// render, which is every position tick, so clearing it here would
-\t\t\t\t// re-fire the request on each tick for the rest of the song.
-\t\t\t\t// Failures wait for the next track instead.
-\t\t\t\tconsole.error("[auto-translate] failed", error);
-\t\t\t});
-\t}""",
+        '\tinfoFromTrack(track) {',
+        '\t// Machine-translate the current lyrics for the auto-translate source.\n\t// Called from lyricsSource(), which runs during render, so this must never\n\t// setState synchronously — the request is keyed and resolves later.\n\trequestAutoTranslation(uri, lyrics, sourceLang, targetLang) {\n\t\tif (typeof ProviderAutoTranslate === "undefined" || !Array.isArray(lyrics) || !lyrics.length) return;\n\n\t\tconst key = `${uri}::${targetLang}::${lyrics.length}::${lyrics[0]?.text ?? ""}`;\n\t\tif (this._autoTranslateKey === key) return;\n\t\tthis._autoTranslateKey = key;\n\n\t\t// detectLanguage() only recognises CJK, so it is undefined for most\n\t\t// languages. Let the service auto-detect unless there is an override.\n\t\tconst override = CONFIG.visual["translate:detect-language-override"];\n\t\tconst from = override !== "off" ? override.slice(0, 2) : /^[a-z]{2}$/.test(sourceLang ?? "") ? sourceLang : null;\n\n\t\tProviderAutoTranslate.getTranslation(lyrics, uri, from, targetLang)\n\t\t\t.then((translated) => {\n\t\t\t\tif (this._autoTranslateKey !== key) return;\n\t\t\t\tCACHE[uri] = { ...CACHE[uri], autoTranslation: translated };\n\t\t\t\tthis.setState({ autoTranslation: translated });\n\t\t\t})\n\t\t\t.catch((error) => {\n\t\t\t\t// Deliberately keep the key set. lyricsSource() runs on every\n\t\t\t\t// render, which is every position tick, so clearing it here would\n\t\t\t\t// re-fire the request on each tick for the rest of the song.\n\t\t\t\t// Failures wait for the next track instead.\n\t\t\t\tconsole.error("[auto-translate] failed", error);\n\t\t\t});\n\t}\n\n\tinfoFromTrack(track) {',
     ),
     # Route the "autoTranslation:<lang>" menu value to the autoTranslation state key.
     (
@@ -329,6 +303,14 @@ EDITS = [
 # to reverse the current EDITS, so without this a shipped-then-retired edit
 # would be stranded in an already-patched tree forever. (patched, original)
 RETIRED = [
+    # Pre-2.45.0 form of the request method: anchored on the constructor's last
+    # line and initialised its key there. spicetify 2.45.0 added a field to that
+    # constructor, so the anchor stopped matching and install refused.
+    (
+        "index.js",
+        '\t\tthis._musixmatchTranslationRequestId = null;\n\t\tthis._autoTranslateKey = null;\n\t}\n\n\t// Machine-translate the current lyrics for the auto-translate source.\n\t// Called from lyricsSource(), which runs during render, so this must never\n\t// setState synchronously — the request is keyed and resolves later.\n\trequestAutoTranslation(uri, lyrics, sourceLang, targetLang) {\n\t\tif (typeof ProviderAutoTranslate === "undefined" || !Array.isArray(lyrics) || !lyrics.length) return;\n\n\t\tconst key = `${uri}::${targetLang}::${lyrics.length}::${lyrics[0]?.text ?? ""}`;\n\t\tif (this._autoTranslateKey === key) return;\n\t\tthis._autoTranslateKey = key;\n\n\t\t// detectLanguage() only recognises CJK, so it is undefined for most\n\t\t// languages. Let the service auto-detect unless there is an override.\n\t\tconst override = CONFIG.visual["translate:detect-language-override"];\n\t\tconst from = override !== "off" ? override.slice(0, 2) : /^[a-z]{2}$/.test(sourceLang ?? "") ? sourceLang : null;\n\n\t\tProviderAutoTranslate.getTranslation(lyrics, uri, from, targetLang)\n\t\t\t.then((translated) => {\n\t\t\t\tif (this._autoTranslateKey !== key) return;\n\t\t\t\tCACHE[uri] = { ...CACHE[uri], autoTranslation: translated };\n\t\t\t\tthis.setState({ autoTranslation: translated });\n\t\t\t})\n\t\t\t.catch((error) => {\n\t\t\t\t// Deliberately keep the key set. lyricsSource() runs on every\n\t\t\t\t// render, which is every position tick, so clearing it here would\n\t\t\t\t// re-fire the request on each tick for the rest of the song.\n\t\t\t\t// Failures wait for the next track instead.\n\t\t\t\tconsole.error("[auto-translate] failed", error);\n\t\t\t});\n\t}',
+        '\t\tthis._musixmatchTranslationRequestId = null;\n\t}',
+    ),
     # Third form of the snap-to-top: retried for 3s, but walked up looking for
     # an ancestor whose content overflows. Overflowing is not the same as
     # scrollable — it stopped on .lyrics-lyricsContainer-LyricsContainer,
