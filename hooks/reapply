@@ -20,7 +20,9 @@ say() {
 	echo ":: lyric-gloss: $*"
 }
 
-# shellcheck disable=SC2329  # invoked from the EXIT trap in main
+# Invoked from the EXIT trap in main. Newer shellcheck reports that as SC2329,
+# older releases (as on the CI runner) as SC2317 — suppress both.
+# shellcheck disable=SC2317,SC2329
 restore_perms() {
 	chown -R root:root "$SPOTIFY_DIR" 2>/dev/null || true
 	find "$SPOTIFY_DIR/Apps" -type d -exec chmod 755 {} + 2>/dev/null || true
