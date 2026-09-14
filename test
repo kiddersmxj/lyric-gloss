@@ -31,13 +31,14 @@ if [[ $what == all || $what == provider ]]; then
 fi
 
 if [[ $what == all || $what == shell ]]; then
-	scripts=(install.sh uninstall.sh install-hook.sh hooks/reapply test)
+	scripts=(install.sh uninstall.sh install-hook.sh hooks/reapply scripts/status.sh scripts/devtools.sh test)
 	for script in "${scripts[@]}"; do
 		run "parses: $script" bash -n "$script"
 	done
 	if command -v shellcheck >/dev/null; then
 		run "shellcheck" shellcheck "${scripts[@]}"
 	fi
+	run "compiles: scripts/lrclib-compare.py" python3 -m py_compile scripts/lrclib-compare.py
 fi
 
 echo

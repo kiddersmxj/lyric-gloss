@@ -25,4 +25,4 @@ jobs:
       # Everything here is offline: the patch runs against a synthetic
       # lyrics-plus fixture and the provider against a fake endpoint. No
       # spicetify install, no Spotify, no network.
-      - run: ./test
+      - run: make test
