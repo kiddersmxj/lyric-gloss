@@ -110,6 +110,38 @@ To see which installer runs touched `/opt`, and for how long:
 journalctl -q _COMM=sudo --since today | grep -E 'COMMAND=.*(chmod a\+wr|chown -R root:root) /opt/spotify'
 ```
 
+### A fix is committed but Spotify behaves as before
+
+**Symptom:** a change to the patch set is committed and the installer has been
+run, but Spotify behaves exactly as it did. The running bundle's timestamp
+predates the change, and there is no installer run in sudo's journal for it.
+
+**Cause:** the installer refused before reaching the sudo step, so nothing was
+applied. Seen 2026-09-14: upgrading spicetify to 2.45.0 replaced lyrics-plus
+with its stock copy, which had one new line exactly where a patch edit was
+anchored. The refusal — *"upstream changed, patch NOT applied"* — is a single
+line in the output and easy to miss.
+
+A `spicetify upgrade` also leaves our provider file behind in the otherwise
+stock app, so the directory looks half-installed.
+
+**Check which anchors a lyrics-plus release breaks** before running anything:
+
+```sh
+python3 - <<'EOF'
+import importlib.util, pathlib
+s = importlib.util.spec_from_file_location("p", "patch.py"); p = importlib.util.module_from_spec(s); s.loader.exec_module(p)
+app, staged = pathlib.Path.home() / ".spicetify/CustomApps/lyrics-plus", {}
+for i, (name, anchor, repl) in enumerate(p.EDITS):
+    text = staged.get(name) or (app / name).read_text()
+    if text.count(anchor) == 1: staged[name] = text.replace(anchor, repl)
+    else: print(i, name, repr(anchor.strip().splitlines()[0][:70]))
+EOF
+```
+
+**When re-anchoring,** prefer the start of a neighbouring declaration over the
+last line of a block: blocks grow at the end, which is exactly what broke here.
+
 ### The pacman hook
 
 `install-hook.sh` installs two root-owned files: the trigger at

@@ -32,9 +32,10 @@ snapshot of one variant, not the truth.
 
 **Verify against a fresh spicetify.** The patch is only ever exercised against
 one machine's `lyrics-plus`. The test fixture deliberately does not track
-upstream, so nothing catches an anchor moving until someone installs. A CI job
-that fetches a pinned spicetify release and runs `patch.py apply` against the
-real app would close that gap.
+upstream, so nothing catches an anchor moving until someone installs — which is
+what happened with spicetify 2.45.0. A scheduled CI job that fetches the latest
+spicetify release and runs `patch.py apply` against its real lyrics-plus would
+have flagged it the day the release came out, before anyone upgraded.
 
 ## Bigger changes
 

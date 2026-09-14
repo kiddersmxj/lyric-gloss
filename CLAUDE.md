@@ -31,7 +31,7 @@ a way that survives `spicetify restore`, permission fixes and cache clears.
 
 **Spicetify must be newer than the installed Spotify.** An older spicetify
 throws inside the lyrics route and can crash the client. `install.sh` enforces
-`>= 2.44.0`. Beware "restoring the previous version" — a spicetify that was fine
+`>= 2.45.0`. Beware "restoring the previous version" — a spicetify that was fine
 while dormant is not fine once applied.
 
 **Settings the UI no longer exposes must be *forced*, not defaulted.**
